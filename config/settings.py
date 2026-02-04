@@ -43,7 +43,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    "users",
+
     'core',
+
+    #local apps
+    "menu",
+    "chef",
+    
 ]
 
 MIDDLEWARE = [
@@ -148,3 +155,4 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # Where files go for product
 # This enables compression and caching (highly recommended)
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+AUTH_USER_MODEL = "users.User"
