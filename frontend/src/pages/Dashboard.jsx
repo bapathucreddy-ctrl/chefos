@@ -75,7 +75,7 @@ export default function Dashboard() {
     const start = new Date(subscription.start_date)
     const end = new Date(subscription.end_date)
     const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24))
-    return diffDays <= 8 ? "Weekly" : "Monthly"
+    return subscription?.pricing?.plan_cycle || (diffDays <= 8 ? "Weekly" : diffDays >= 80 ? "Quarterly" : "Monthly")
   }, [subscription])
 
   const tracking = useMemo(() => {
@@ -116,7 +116,7 @@ export default function Dashboard() {
           <div className="grid lg:grid-cols-[1.28fr_0.72fr]">
             <div className="relative min-h-[330px]">
               <img src={HERO_IMAGE_URL} alt="Kitchen overview" className="absolute inset-0 h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[rgba(12,30,23,0.86)] via-[rgba(12,30,23,0.6)] to-[rgba(12,30,23,0.24)]" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[rgba(12,30,56,0.86)] via-[rgba(12,30,56,0.6)] to-[rgba(12,30,56,0.24)]" />
 
               <div className="relative h-full p-6 md:p-8 flex flex-col justify-between">
                 <div>
@@ -135,7 +135,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="p-5 md:p-6 bg-[linear-gradient(165deg,#f4fbf7_0%,#ecf5ff_100%)] border-l border-[rgba(17,33,26,0.1)]">
+            <div className="p-5 md:p-6 bg-[linear-gradient(165deg,#f2f5fa_0%,#ecf5ff_100%)] border-l border-[rgba(17,33,26,0.1)]">
               <img src={SIDE_IMAGE_URL} alt="Fresh ingredients" className="h-36 w-full rounded-2xl object-cover soft-border" />
 
               <div className="mt-4 grid gap-3">
@@ -254,7 +254,7 @@ function DashboardCard({ title, desc, status, action, onAction, tone }) {
 
 function StatusBadge({ status }) {
   const styles = {
-    Active: "bg-[#dcfbe9] text-[#0f7a5e] border-[#aee6cc]",
+    Active: "bg-[#dcfbe9] text-[#14213D] border-[#aee6cc]",
     Live: "bg-[#ddefff] text-[#235aa8] border-[#b7d8ff]",
     "Not Set": "bg-[#fff2d9] text-[#99601a] border-[#ffdca5]",
   }

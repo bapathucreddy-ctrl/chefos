@@ -12,10 +12,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -24,6 +26,9 @@ from menu.models import UserPreference, WeeklyMenu
 
 from .models import Subscription, Feedback, ChefAssignment, PaymentTransaction
 from .ai_menu import generate_menu_with_ai
+from .pricing import (PricingError, customer_catalog, customer_quote,
+                      get_pricing_config, household_band, normalize_cycle, quote_instant)
+from .pricing_service import chef_pricing_inputs, locked_quote, resolve_chef, subscription_quote
 from .cache_utils import (
     cache_key_active_subscription,
     cache_key_chef_list,
@@ -75,41 +80,45 @@ def _razorpay_keys():
 
 
 def _normalize_plan_cycle(value):
-    cycle = str(value or "").strip().lower()
-    return "weekly" if cycle == "weekly" else "monthly"
+    try:
+        return normalize_cycle(value)
+    except PricingError as exc:
+        raise ValidationError({"detail": str(exc)})
 
 
 def _effective_people_count(user, requested_people_count=None):
+    requested = requested_people_count
+    if requested in (None, "", "null"):
+        preference = UserPreference.objects.filter(user=user).only("people_count").first()
+        requested = preference.people_count if preference and preference.people_count else 1
     try:
-        requested = int(requested_people_count) if requested_people_count not in (None, "", "null") else None
-    except (TypeError, ValueError):
-        requested = None
-    if requested and requested > 0:
-        return requested
-    preference = UserPreference.objects.filter(user=user).only("people_count").first()
-    if preference and preference.people_count:
-        return max(1, int(preference.people_count))
-    return 1
+        household_band(requested)
+        return int(requested)
+    except PricingError as exc:
+        raise ValidationError({"detail": str(exc), "custom_quote_required": str(requested).isdigit() and int(requested) >= 9})
 
 
-def _server_subscription_price(meal_type, plan_cycle, people_count):
-    # Temporary pricing override requested by user.
-    return 2
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def pricing_catalog(request):
+    return Response(customer_catalog())
 
-    meal_count = len(normalize_meal_type(meal_type))
-    meal_count = min(max(meal_count, 1), 3)
-    tier = "4-6" if int(people_count) >= 3 else "1-2"
 
-    monthly = {
-        "1-2": {1: 5000, 2: 7500, 3: 9500},
-        "4-6": {1: 6500, 2: 9500, 3: 13500},
-    }
-    weekly = {
-        "1-2": {1: 1750, 2: 2400, 3: 2800},
-        "4-6": {1: 2250, 2: 2800, 3: 3500},
-    }
-    table = weekly if _normalize_plan_cycle(plan_cycle) == "weekly" else monthly
-    return int(table[tier][meal_count])
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def instant_price_preview(request):
+    people = _effective_people_count(request.user, request.query_params.get("people_count"))
+    chef = resolve_chef(request.user, request.query_params.get("chef"))
+    try:
+        raw = request.query_params.get("meal_count", "1")
+        if str(raw) not in ("1", "2"):
+            raise PricingError("Instant bookings support one or two meals only")
+        quote = quote_instant(people_count=people, meals=int(raw), payout=chef_pricing_inputs(chef)["payout"])
+    except PricingError as exc:
+        raise ValidationError({"detail": str(exc)})
+    return Response({**customer_quote(quote), "same_day_same_home": get_pricing_config()["instant"]["same_day_same_home"],
+                     "two_slot_confirmation_required": int(raw) == 2})
 
 
 # -------------------------
@@ -220,12 +229,18 @@ def payment_create_order(request):
         return Response({"detail": "subscription_payload.meal_type is required"}, status=status.HTTP_400_BAD_REQUEST)
     plan_cycle = _normalize_plan_cycle(subscription_payload.get("plan_cycle"))
     people_count = _effective_people_count(request.user, subscription_payload.get("people_count"))
-    price_inr = _server_subscription_price(meal_type, plan_cycle, people_count)
+    chef = resolve_chef(request.user, subscription_payload.get("chef"))
+    pricing = subscription_quote(request.user, meal_type, plan_cycle, people_count,
+                                 chef, subscription_payload.get("coupon_code", ""))
+    subscription_payload = {**subscription_payload, "plan_cycle": plan_cycle,
+                            "people_count": people_count, "meal_type": meal_type,
+                            "chef": chef.pk if chef else None, "pricing_snapshot": pricing}
+    price_inr = pricing["price_inr"]
     amount_paise = price_inr * 100
 
     body = {
         "amount": amount_paise,
-        "currency": "INR",
+        "currency": pricing["currency"],
         "receipt": receipt,
         "notes": {
             "user_id": str(request.user.id),
@@ -253,6 +268,8 @@ def payment_create_order(request):
     order_id = str(payload.get("id", "")).strip()
     if not order_id:
         return Response({"detail": "Invalid order response from payment gateway"}, status=status.HTTP_502_BAD_GATEWAY)
+    if payload.get("amount", amount_paise) != amount_paise or payload.get("currency", pricing["currency"]) != pricing["currency"]:
+        return Response({"detail": "Payment gateway amount or currency does not match the quote."}, status=502)
 
     PaymentTransaction.objects.create(
         user=request.user,
@@ -276,6 +293,7 @@ def payment_create_order(request):
             "currency": str(payload.get("currency", "INR")),
             "name": "Chefos",
             "description": "Subscription payment",
+            "pricing": customer_quote(pricing),
         }
     )
 
@@ -292,19 +310,14 @@ def subscription_price_preview(request):
 
     plan_cycle = _normalize_plan_cycle(request.query_params.get("plan_cycle"))
     people_count = _effective_people_count(request.user, request.query_params.get("people_count"))
-    price_inr = _server_subscription_price(meal_type, plan_cycle, people_count)
-
-    return Response(
-        {
-            "price_inr": price_inr,
-            "amount_paise": price_inr * 100,
-            "plan_cycle": plan_cycle,
-            "people_count": people_count,
-            "people_tier": "4-6" if int(people_count) >= 3 else "1-2",
-            "meal_type": meal_type,
-            "meal_count": len(meal_type),
-        }
-    )
+    chef = resolve_chef(request.user, request.query_params.get("chef"))
+    active = Subscription.objects.filter(user=request.user, is_active=True).first()
+    snapshot = active.pricing_snapshot if active else {}
+    if active and active.chef_id == (chef.pk if chef else None) and set(active.meal_type) == set(meal_type) and (not snapshot or snapshot.get("people_count") == people_count and snapshot.get("plan_cycle") == plan_cycle) and not request.query_params.get("coupon_code"):
+        return Response({**customer_quote(locked_quote(active, people_count)), "meal_type": meal_type, "price_locked": True})
+    pricing = subscription_quote(request.user, meal_type, plan_cycle, people_count,
+                                 chef, request.query_params.get("coupon_code", ""))
+    return Response({**customer_quote(pricing), "meal_type": meal_type})
 
 
 @api_view(['POST'])
@@ -346,6 +359,7 @@ def payment_verify(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def create_subscription(request):
     data = request.data
     request_tz = _get_request_timezone(request)
@@ -382,10 +396,8 @@ def create_subscription(request):
         start_date_value = date.fromisoformat(start_date_raw) if start_date_raw else _current_local_date(request_tz)
         if end_date_raw:
             end_date_value = date.fromisoformat(end_date_raw)
-        elif plan_cycle == "weekly":
-            end_date_value = start_date_value + timedelta(days=7)
         else:
-            end_date_value = start_date_value + timedelta(days=30)
+            end_date_value = start_date_value + timedelta(days=get_pricing_config()["plans"][plan_cycle]["days"] - 1)
     except ValueError:
         return Response(
             {"detail": "start_date/end_date must be YYYY-MM-DD"},
@@ -417,7 +429,41 @@ def create_subscription(request):
         )
 
     people_count = _effective_people_count(request.user, data.get("people_count"))
-    server_price = _server_subscription_price(meal_type, plan_cycle, people_count)
+    paid_transaction = None
+    if not active_subscription:
+        order_id = data.get("payment_order_id")
+        if not order_id:
+            return Response({"detail": "A verified payment order is required to activate a subscription."}, status=400)
+        paid_transaction = PaymentTransaction.objects.select_for_update().filter(
+            user=request.user, order_id=order_id, status=PaymentTransaction.STATUS_PAID).first()
+        if not paid_transaction:
+            return Response({"detail": "Verified payment order not found."}, status=400)
+        paid_payload = paid_transaction.subscription_payload
+        pricing = paid_payload.get("pricing_snapshot", {})
+        if paid_payload.get("subscription_id"):
+            return Response({"detail": "This payment order has already been used."}, status=409)
+        if not pricing or (pricing.get("people_count"), pricing.get("plan_cycle"), pricing.get("chef_id"), set(paid_payload.get("meal_type", []))) != (people_count, plan_cycle, chef.pk if chef else None, set(meal_type)):
+            return Response({"detail": "The selected plan does not match the paid quote."}, status=400)
+        if pricing.get("amount_paise") != paid_transaction.amount:
+            return Response({"detail": "The payment amount does not match the saved quote."}, status=400)
+        if not end_date_raw:
+            end_date_value = start_date_value + timedelta(days=pricing["days"] - 1)
+    else:
+        pricing = subscription_quote(request.user, meal_type, plan_cycle, people_count, chef, data.get("coupon_code", ""))
+    if active_subscription:
+        snapshot = active_subscription.pricing_snapshot
+        if snapshot and (snapshot.get("people_count") != people_count or snapshot.get("plan_cycle") != plan_cycle):
+            return Response({"detail": "Household size and billing cycle can be changed at renewal only."}, status=409)
+        if active_subscription.chef_id == (chef.pk if chef else None):
+            pricing = locked_quote(active_subscription, people_count)
+        elif pricing["price_inr"] != active_subscription.price:
+            return Response({"detail": "Changing to this chef requires a remaining-meal price adjustment before confirmation."}, status=409)
+        # Keep the current billing period; an update cannot extend a paid plan.
+        if start_date_value != active_subscription.start_date or end_date_value != active_subscription.end_date:
+            return Response({"detail": "An active plan keeps its current billing dates until renewal."}, status=409)
+    elif (end_date_value - start_date_value).days + 1 != pricing["days"]:
+        return Response({"detail": "Billing dates must match the selected plan duration."}, status=400)
+    server_price = pricing["price_inr"]
     client_price = data.get("price")
     if client_price not in (None, ""):
         try:
@@ -513,6 +559,8 @@ def create_subscription(request):
         active_subscription.start_date = start_date_value
         active_subscription.end_date = end_date_value
         active_subscription.price = server_price
+        if active_subscription.pricing_snapshot or pricing.get("pricing_version") != "legacy":
+            active_subscription.pricing_snapshot = pricing
         active_subscription.is_active = True
         active_subscription.save()
         menu_refresh_error = None
@@ -539,8 +587,12 @@ def create_subscription(request):
         start_date=start_date_value,
         end_date=end_date_value,
         price=server_price,
+        pricing_snapshot=pricing,
         is_active=True,
     )
+    if paid_transaction:
+        paid_transaction.subscription_payload = {**paid_transaction.subscription_payload, "subscription_id": subscription.pk}
+        paid_transaction.save(update_fields=["subscription_payload", "updated_at"])
     menu_refresh_error = None
     try:
         _create_ai_menu_for_user(request.user, selected_meals_override=meal_type)

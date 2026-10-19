@@ -475,7 +475,11 @@ class ChefListView(ListAPIView):
         selected_meals_raw = (request.query_params.get("selected_meals") or "").strip()
         selected_meals = [m.strip().lower() for m in selected_meals_raw.split(",") if m.strip()]
         selected_meals = [m for m in selected_meals if m in {"breakfast", "lunch", "dinner"}]
-        plan_cycle = str(request.query_params.get("plan_cycle", "monthly")).strip().lower()
+        from core.pricing import get_pricing_config, normalize_cycle, PricingError
+        try:
+            plan_cycle = normalize_cycle(request.query_params.get("plan_cycle", "monthly"))
+        except PricingError as exc:
+            return Response({"detail": str(exc)}, status=400)
         selected_suffix = ",".join(selected_meals) if selected_meals else "none"
         suffix = f"{suffix}:meals:{selected_suffix}:cycle:{plan_cycle}"
 
@@ -500,7 +504,7 @@ class ChefListView(ListAPIView):
 
         serializer_data = self.get_serializer(chefs_list, many=True).data
         start_date = timezone.localdate()
-        end_date = start_date + timedelta(days=7 if plan_cycle == "weekly" else 30)
+        end_date = start_date + timedelta(days=get_pricing_config()["plans"][plan_cycle]["days"] - 1)
 
         enriched = []
         for item in serializer_data:
@@ -1481,6 +1485,9 @@ class UserInstantOrderFeedbackView(APIView):
 
 
 def _subscription_unit_earning(subscription: Subscription) -> float:
+    payout = (subscription.pricing_snapshot or {}).get("chef_payout_per_meal")
+    if payout is not None:
+        return float(payout)
     price = float(subscription.price or 0)
     if price <= 0:
         return 0.0

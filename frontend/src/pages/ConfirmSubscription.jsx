@@ -9,7 +9,7 @@ import api from "../services/api"
 const DEFAULT_WAVE = {
   breakfast: "B2",
   lunch: "L2",
-  dinner: "D2",
+  dinner: "D2"
 }
 
 const WAVE_TIME_LABELS = {
@@ -18,22 +18,22 @@ const WAVE_TIME_LABELS = {
     B2: "07:30 - 08:50",
     B3: "09:00 - 10:20",
     B4: "10:30 - 11:30",
-    B5: "11:30 - 12:30",
+    B5: "11:30 - 12:30"
   },
   lunch: {
     L1: "12:00 - 13:20",
     L2: "13:30 - 14:50",
     L3: "15:00 - 16:20",
     L4: "16:30 - 17:30",
-    L5: "17:30 - 18:30",
+    L5: "17:30 - 18:30"
   },
   dinner: {
     D1: "18:30 - 19:50",
     D2: "20:00 - 21:20",
     D3: "21:30 - 22:50",
     D4: "23:00 - 23:59",
-    D5: "00:00 - 01:00",
-  },
+    D5: "00:00 - 01:00"
+  }
 }
 
 function parsePlan() {
@@ -57,19 +57,23 @@ export default function ConfirmSubscription() {
   const [error, setError] = useState("")
   const [mealWave, setMealWave] = useState({})
   const [serverPrice, setServerPrice] = useState(null)
+  const [priceQuote, setPriceQuote] = useState(null)
+  const [quoteError, setQuoteError] = useState("")
 
   useEffect(() => {
     Promise.allSettled([
       api.get("chefs/assigned/"),
       api.get("menu/preference/"),
       api.get("menu/weekly/"),
-      api.get("subscription/active/"),
+      api.get("subscription/active/")
     ])
       .then(([chefRes, prefRes, menuRes, subRes]) => {
-        if (chefRes.status === "fulfilled") setAssignedChef(chefRes.value.data.chef)
+        if (chefRes.status === "fulfilled")
+          setAssignedChef(chefRes.value.data.chef)
         if (prefRes.status === "fulfilled") setPreference(prefRes.value.data)
         if (menuRes.status === "fulfilled") setMenu(menuRes.value.data)
-        if (subRes.status === "fulfilled") setActiveSubscription(subRes.value.data)
+        if (subRes.status === "fulfilled")
+          setActiveSubscription(subRes.value.data)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -93,7 +97,9 @@ export default function ConfirmSubscription() {
       if (!Array.isArray(items)) return []
       const cleaned = []
       for (const item of items) {
-        const meal = String(item || "").toLowerCase().trim()
+        const meal = String(item || "")
+          .toLowerCase()
+          .trim()
         if (!allowed.has(meal) || cleaned.includes(meal)) continue
         cleaned.push(meal)
       }
@@ -111,11 +117,22 @@ export default function ConfirmSubscription() {
     // Fallback: latest menu payload.
     return normalize(menuDerivedMeals)
   }, [plan, activeSubscription, menuDerivedMeals])
-  const subscriptionMealsKey = useMemo(() => subscriptionMeals.join(","), [subscriptionMeals])
+  const subscriptionMealsKey = useMemo(
+    () => subscriptionMeals.join(","),
+    [subscriptionMeals]
+  )
 
-  const planCycle = plan?.plan_cycle || "monthly"
-  const peopleCount = Number(plan?.people_count || preference?.people_count || 1)
-  const peopleTier = peopleCount >= 3 ? "4-6" : "1-2"
+  const planCycle =
+    activeSubscription?.pricing?.plan_cycle || plan?.plan_cycle || "monthly"
+  const peopleCount = Number(
+    activeSubscription?.pricing?.people_count ||
+      plan?.people_count ||
+      preference?.people_count ||
+      1
+  )
+  const peopleTier =
+    priceQuote?.people_tier ||
+    (peopleCount > 8 ? "Custom quote" : "Quote pending")
   const dinnerSelected = subscriptionMeals.includes("dinner")
   const selectedSlotSummary = useMemo(() => {
     if (!subscriptionMeals.length) return "Not selected"
@@ -135,7 +152,9 @@ export default function ConfirmSubscription() {
     setMealWave((prev) => {
       const next = { ...prev }
       for (const meal of subscriptionMeals) {
-        next[meal] = String(fromPlan[meal] || fromActive[meal] || DEFAULT_WAVE[meal] || "").toUpperCase()
+        next[meal] = String(
+          fromPlan[meal] || fromActive[meal] || DEFAULT_WAVE[meal] || ""
+        ).toUpperCase()
       }
       return next
     })
@@ -150,16 +169,31 @@ export default function ConfirmSubscription() {
         return
       }
       try {
+        if (!cancelled) {
+          setQuoteError("")
+          setServerPrice(null)
+          setPriceQuote(null)
+        }
         const res = await api.get("subscriptions/price-preview/", {
           params: {
             meal_type: subscriptionMealsKey,
             plan_cycle: planCycle,
             people_count: peopleCount,
-          },
+            chef: assignedChef?.id
+          }
         })
-        if (!cancelled) setServerPrice(Number(res?.data?.price_inr) || null)
-      } catch {
-        if (!cancelled) setServerPrice(null)
+        if (!cancelled) {
+          setServerPrice(Number(res?.data?.price_inr) || null)
+          setPriceQuote(res.data)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setServerPrice(null)
+          setQuoteError(
+            err?.response?.data?.detail ||
+              "Pricing is temporarily unavailable. Please try again."
+          )
+        }
       }
     }
 
@@ -167,24 +201,15 @@ export default function ConfirmSubscription() {
     return () => {
       cancelled = true
     }
-  }, [subscriptionMealsKey, planCycle, peopleCount])
+  }, [subscriptionMealsKey, planCycle, peopleCount, assignedChef?.id])
 
-  const price = useMemo(() => {
-    if (typeof serverPrice === "number" && Number.isFinite(serverPrice)) return serverPrice
-    const mealCount = subscriptionMeals.length || 1
-    const monthly = {
-      "1-2": { 1: 5000, 2: 7500, 3: 9500 },
-      "4-6": { 1: 6500, 2: 9500, 3: 13500 },
-    }
-    const weekly = {
-      "1-2": { 1: 1750, 2: 2400, 3: 2800 },
-      "4-6": { 1: 2250, 2: 2800, 3: 3500 },
-    }
-    const table = planCycle === "weekly" ? weekly : monthly
-    return table[peopleTier][mealCount] || table[peopleTier][1]
-  }, [planCycle, subscriptionMeals, peopleTier, serverPrice])
+  const price = serverPrice
 
   const handleSubscribe = async () => {
+    if (price === null) {
+      setError("A confirmed price quote is required before continuing.")
+      return
+    }
     if (!assignedChef) {
       setError("Assign a chef before subscribing.")
       return
@@ -203,23 +228,27 @@ export default function ConfirmSubscription() {
         meal_type: subscriptionMeals,
         meal_wave: mealWave,
         plan_cycle: planCycle,
-        people_count: peopleCount,
+        people_count: peopleCount
       }
       if (isUpdate) {
         // Existing active subscribers can switch chef without paying again.
         await api.post("subscriptions/create/", subscriptionPayload)
       } else {
         const orderRes = await api.post("payments/create-order/", {
-          subscription_payload: subscriptionPayload,
+          subscription_payload: subscriptionPayload
         })
         const order = orderRes?.data || {}
         const paymentResult = await openRazorpayCheckout(order)
         await api.post("payments/verify/", {
           razorpay_order_id: paymentResult.razorpay_order_id || order.order_id,
           razorpay_payment_id: paymentResult.razorpay_payment_id,
-          razorpay_signature: paymentResult.razorpay_signature,
+          razorpay_signature: paymentResult.razorpay_signature
         })
-        await api.post("subscriptions/create/", { ...subscriptionPayload, price: order.price_inr || price })
+        await api.post("subscriptions/create/", {
+          ...subscriptionPayload,
+          price: order.price_inr,
+          payment_order_id: order.order_id
+        })
       }
 
       const existing = parsePlan() || {}
@@ -229,15 +258,19 @@ export default function ConfirmSubscription() {
           ...existing,
           selected_meals: subscriptionMeals,
           meal_wave: mealWave,
-          plan_cycle: planCycle,
+          plan_cycle: planCycle
         })
       )
       window.location.replace(`/dashboard?updated=${Date.now()}`)
       return
     } catch (err) {
       const payload = err?.response?.data
-      if (err?.response?.status === 409 && payload?.detail) setError(payload.detail)
-      else setError(payload?.detail || "Failed to save subscription. Please try again.")
+      if (err?.response?.status === 409 && payload?.detail)
+        setError(payload.detail)
+      else
+        setError(
+          payload?.detail || "Failed to save subscription. Please try again."
+        )
     } finally {
       setSubmitting(false)
     }
@@ -251,17 +284,31 @@ export default function ConfirmSubscription() {
 
       <main className="max-w-5xl mx-auto px-6 py-14">
         <div className="mb-10">
-          <h1 className="text-4xl font-medium tracking-tight">Review and Confirm</h1>
-          <p className="mt-2 text-[var(--color-muted)] text-lg">Confirm your chef and meal plan.</p>
+          <h1 className="text-4xl font-medium tracking-tight">
+            Review and Confirm
+          </h1>
+          <p className="mt-2 text-[var(--color-muted)] text-lg">
+            Confirm your chef and meal plan.
+          </p>
         </div>
 
         {loading && (
-          <PageState kind="loading" title="Loading your subscription summary" message="Fetching chef, menu, and preference details." className="mb-6" />
+          <PageState
+            kind="loading"
+            title="Loading your subscription summary"
+            message="Fetching chef, menu, and preference details."
+            className="mb-6"
+          />
         )}
 
-          {!loading && error && (
-            <PageState kind="error" title="Action required" message={error} className="mb-6" />
-          )}
+        {!loading && error && (
+          <PageState
+            kind="error"
+            title="Action required"
+            message={error}
+            className="mb-6"
+          />
+        )}
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">
@@ -270,13 +317,22 @@ export default function ConfirmSubscription() {
               {assignedChef ? (
                 <div>
                   <p className="text-lg font-medium">{assignedChef.name}</p>
-                  <p className="text-sm text-[var(--color-muted)]">⭐ {assignedChef.rating} • {assignedChef.speciality}</p>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    ⭐ {assignedChef.rating} • {assignedChef.speciality}
+                  </p>
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm text-[var(--color-muted)]">No chef assigned yet.</p>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    No chef assigned yet.
+                  </p>
                   <div className="mt-4">
-                    <Button variant="outline" onClick={() => navigate("/find-chef")}>Assign Chef</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate("/find-chef")}
+                    >
+                      Assign Chef
+                    </Button>
                   </div>
                 </div>
               )}
@@ -287,28 +343,84 @@ export default function ConfirmSubscription() {
 
               <div className="grid sm:grid-cols-2 gap-6 text-sm">
                 <Detail label="Plan cycle" value={planCycle} />
-                <Detail label="Meals" value={subscriptionMeals.length ? subscriptionMeals.join(", ") : "Not selected"} />
+                <Detail
+                  label="Meals"
+                  value={
+                    subscriptionMeals.length
+                      ? subscriptionMeals.join(", ")
+                      : "Not selected"
+                  }
+                />
                 <Detail label="Goal" value={preference?.goal || "Not set"} />
-                <Detail label="Preference" value={preference?.food_type || "Not set"} />
-                <Detail label="People" value={`${peopleCount} (${peopleTier})`} />
-                <Detail label="Dinner" value={dinnerSelected ? "Included" : "Not included"} />
-                <Detail label="Allergies" value={preference?.allergies || "None"} />
-                <Detail label="Selected time slot" value={selectedSlotSummary} />
-                <Detail label="Status" value={isUpdate ? "Active (will update)" : "Pending"} />
+                <Detail
+                  label="Preference"
+                  value={preference?.food_type || "Not set"}
+                />
+                <Detail
+                  label="People"
+                  value={`${peopleCount} (${peopleTier})`}
+                />
+                <Detail
+                  label="Dinner"
+                  value={dinnerSelected ? "Included" : "Not included"}
+                />
+                <Detail
+                  label="Allergies"
+                  value={preference?.allergies || "None"}
+                />
+                <Detail
+                  label="Selected time slot"
+                  value={selectedSlotSummary}
+                />
+                <Detail
+                  label="Status"
+                  value={isUpdate ? "Active (will update)" : "Pending"}
+                />
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-3xl p-8 border border-[rgba(0,0,0,0.06)] shadow-[0_20px_40px_rgba(0,0,0,0.08)] flex flex-col">
-            <p className="text-sm uppercase tracking-wide text-[var(--color-muted)]">Price</p>
+            <p className="text-sm uppercase tracking-wide text-[var(--color-muted)]">
+              Price
+            </p>
 
             <div className="mt-3 mb-6">
-              <span className="text-4xl font-medium">Rs {price}</span>
-              <span className="text-sm text-[var(--color-muted)]"> / {planCycle === "weekly" ? "week" : "month"}</span>
+              <span className="text-4xl font-medium">
+                {price === null
+                  ? "Quote unavailable"
+                  : `Rs ${price.toLocaleString("en-IN")}`}
+              </span>
+              <span className="text-sm text-[var(--color-muted)]">
+                {" "}
+                /{" "}
+                {planCycle === "weekly"
+                  ? "week"
+                  : planCycle === "quarterly"
+                    ? "quarter"
+                    : "month"}
+              </span>
+              {priceQuote && (
+                <p className="mt-3 text-sm text-[var(--color-muted)]">
+                  Rs {priceQuote.per_meal_inr} per home per meal ×{" "}
+                  {priceQuote.total_meals} meals. Before GST.
+                  {priceQuote.coupon_code
+                    ? ` ${priceQuote.coupon_code} applied.`
+                    : ""}
+                  {priceQuote.price_locked
+                    ? " Your current rate is locked until renewal."
+                    : ""}
+                </p>
+              )}
+              {quoteError && (
+                <p role="alert" className="mt-3 text-sm text-red-700">
+                  {quoteError}
+                </p>
+              )}
             </div>
 
             <ul className="text-sm space-y-2 mb-8">
-              <li>- Plan can be updated any time</li>
+              <li>- Household size and plan price are locked until renewal</li>
               <li>- Meals follow your AI selection</li>
               <li>- Support included</li>
             </ul>
@@ -317,9 +429,15 @@ export default function ConfirmSubscription() {
               className="w-full py-3 text-base rounded-xl"
               onClick={handleSubscribe}
               loading={submitting}
-              disabled={loading || !assignedChef}
+              disabled={loading || !assignedChef || price === null}
             >
-              {isUpdate ? (submitting ? "Updating..." : "Update Subscription") : (submitting ? "Starting..." : "Start My Service")}
+              {isUpdate
+                ? submitting
+                  ? "Updating..."
+                  : "Update Subscription"
+                : submitting
+                  ? "Starting..."
+                  : "Start My Service"}
             </Button>
           </div>
         </div>
@@ -348,14 +466,14 @@ function openRazorpayCheckout(order) {
             ...order,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_order_id: response.razorpay_order_id,
-            razorpay_signature: response.razorpay_signature,
+            razorpay_signature: response.razorpay_signature
           })
         },
         modal: {
           ondismiss: function () {
             reject(new Error("Payment cancelled"))
-          },
-        },
+          }
+        }
       }
       const rz = new window.Razorpay(options)
       rz.open()
@@ -390,7 +508,9 @@ function ensureRazorpayScript() {
 function Detail({ label, value }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">
+        {label}
+      </p>
       <p className="mt-1 font-medium capitalize">{value}</p>
     </div>
   )

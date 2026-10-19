@@ -1,148 +1,197 @@
-import { useEffect, useMemo, useState } from "react"
-import { Alert, ImageBackground, StyleSheet, Text, View } from "react-native"
-import * as Location from "expo-location"
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { useEffect, useMemo, useState } from "react";
+import { Alert, ImageBackground, StyleSheet, Text, View } from "react-native";
+import * as Location from "expo-location";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { api } from "../api/client"
-import { readCachedValue, writeCachedValue } from "../api/cache"
-import { Button, LoadingState, Pill, Screen, SectionCard } from "../components/ui"
-import { joinMeals, safeArray, titleCase } from "../utils/format"
-import { palette, typography } from "../theme"
+import { api } from "../api/client";
+import { readCachedValue, writeCachedValue } from "../api/cache";
+import {
+  Button,
+  LoadingState,
+  Pill,
+  Screen,
+  SectionCard,
+} from "../components/ui";
+import { joinMeals, safeArray, titleCase } from "../utils/format";
+import { palette, typography } from "../theme";
 
-const RADIUS_KM = 5
-const CHEF_LIST_CACHE_TTL_MS = 2 * 60 * 1000
-const SUBSCRIPTION_CACHE_TTL_MS = 5 * 60 * 1000
-const INSTANT_REQUEST_CACHE_TTL_MS = 20 * 1000
+const RADIUS_KM = 5;
+const CHEF_LIST_CACHE_TTL_MS = 2 * 60 * 1000;
+const SUBSCRIPTION_CACHE_TTL_MS = 5 * 60 * 1000;
+const INSTANT_REQUEST_CACHE_TTL_MS = 20 * 1000;
 
-export function FindChefScreen() {
-  const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState(null)
-  const [location, setLocation] = useState(null)
-  const [locationLabel, setLocationLabel] = useState("Checking location...")
-  const [chefs, setChefs] = useState([])
-  const [subscription, setSubscription] = useState(null)
-  const [instantRequest, setInstantRequest] = useState(null)
+export function FindChefScreen({ navigation }) {
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const [location, setLocation] = useState(null);
+  const [locationLabel, setLocationLabel] = useState("Checking location...");
+  const [chefs, setChefs] = useState([]);
+  const [subscription, setSubscription] = useState(null);
+  const [instantRequest, setInstantRequest] = useState(null);
 
-  const meals = useMemo(() => safeArray(subscription?.meal_type), [subscription?.meal_type])
+  const meals = useMemo(
+    () => safeArray(subscription?.meal_type),
+    [subscription?.meal_type],
+  );
 
   const load = async (withLocation = true) => {
-    setLoading(true)
-    let coords = location
+    setLoading(true);
+    let coords = location;
     try {
-      const [cachedChefs, cachedSubscription, cachedInstantRequest] = await Promise.all([
-        readCachedValue("chefs:list:nearby", { maxAgeMs: CHEF_LIST_CACHE_TTL_MS }),
-        readCachedValue("subscription:active", { maxAgeMs: SUBSCRIPTION_CACHE_TTL_MS }),
-        readCachedValue("chefs:instant:latest", { maxAgeMs: INSTANT_REQUEST_CACHE_TTL_MS }),
-      ])
+      const [cachedChefs, cachedSubscription, cachedInstantRequest] =
+        await Promise.all([
+          readCachedValue("chefs:list:nearby", {
+            maxAgeMs: CHEF_LIST_CACHE_TTL_MS,
+          }),
+          readCachedValue("subscription:active", {
+            maxAgeMs: SUBSCRIPTION_CACHE_TTL_MS,
+          }),
+          readCachedValue("chefs:instant:latest", {
+            maxAgeMs: INSTANT_REQUEST_CACHE_TTL_MS,
+          }),
+        ]);
 
-      if (cachedChefs) setChefs(safeArray(cachedChefs))
-      if (cachedSubscription) setSubscription(cachedSubscription)
-      if (cachedInstantRequest) setInstantRequest(cachedInstantRequest)
-      if (cachedChefs || cachedSubscription || cachedInstantRequest) setLoading(false)
+      if (cachedChefs) setChefs(safeArray(cachedChefs));
+      if (cachedSubscription) setSubscription(cachedSubscription);
+      if (cachedInstantRequest) setInstantRequest(cachedInstantRequest);
+      if (cachedChefs || cachedSubscription || cachedInstantRequest)
+        setLoading(false);
 
       if (withLocation && !coords) {
-        const permission = await Location.requestForegroundPermissionsAsync()
+        const permission = await Location.requestForegroundPermissionsAsync();
         if (permission.status === "granted") {
-          const current = await Location.getCurrentPositionAsync({})
+          const current = await Location.getCurrentPositionAsync({});
           coords = {
             lat: Number(current.coords.latitude.toFixed(6)),
             lng: Number(current.coords.longitude.toFixed(6)),
-          }
-          setLocation(coords)
-          setLocationLabel(`Showing chefs within ${RADIUS_KM} km`)
+          };
+          setLocation(coords);
+          setLocationLabel(`Showing chefs within ${RADIUS_KM} km`);
         } else {
-          setLocationLabel("Location permission denied. Showing general availability.")
+          setLocationLabel(
+            "Location permission denied. Showing general availability.",
+          );
         }
       }
-      const params = {}
+      const params = {};
       if (coords?.lat && coords?.lng) {
-        params.lat = coords.lat
-        params.lng = coords.lng
-        params.radius_km = RADIUS_KM
+        params.lat = coords.lat;
+        params.lng = coords.lng;
+        params.radius_km = RADIUS_KM;
       }
       const [chefRes, subRes, latestReqRes] = await Promise.allSettled([
         api.get("chefs/", { params }),
         api.get("subscription/active/"),
         api.get("chefs/instant/request/latest/"),
-      ])
+      ]);
       if (chefRes.status === "fulfilled") {
-        const nextChefs = safeArray(chefRes.value.data)
-        setChefs(nextChefs)
-        await writeCachedValue("chefs:list:nearby", nextChefs)
+        const nextChefs = safeArray(chefRes.value.data);
+        setChefs(nextChefs);
+        await writeCachedValue("chefs:list:nearby", nextChefs);
       }
       if (subRes.status === "fulfilled") {
-        setSubscription(subRes.value.data)
-        await writeCachedValue("subscription:active", subRes.value.data)
+        setSubscription(subRes.value.data);
+        await writeCachedValue("subscription:active", subRes.value.data);
       }
       if (latestReqRes.status === "fulfilled") {
-        setInstantRequest(latestReqRes.value.data)
-        await writeCachedValue("chefs:instant:latest", latestReqRes.value.data)
+        setInstantRequest(latestReqRes.value.data);
+        await writeCachedValue("chefs:instant:latest", latestReqRes.value.data);
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    load()
-  }, [])
+    load();
+  }, []);
 
   useEffect(() => {
-    if (!instantRequest?.id || !["searching", "accepted"].includes(String(instantRequest?.status || ""))) return
+    if (
+      !instantRequest?.id ||
+      !["searching", "accepted"].includes(String(instantRequest?.status || ""))
+    )
+      return;
     const timer = setInterval(async () => {
       try {
-        const res = await api.get(`chefs/instant/request/${instantRequest.id}/`)
-        setInstantRequest(res.data)
-        await writeCachedValue("chefs:instant:latest", res.data)
+        const res = await api.get(
+          `chefs/instant/request/${instantRequest.id}/`,
+        );
+        setInstantRequest(res.data);
+        await writeCachedValue("chefs:instant:latest", res.data);
       } catch {}
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [instantRequest?.id, instantRequest?.status])
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [instantRequest?.id, instantRequest?.status]);
 
   const assignChef = async (chefId) => {
-    setBusyId(chefId)
+    setBusyId(chefId);
     try {
-      await api.post("chefs/assign/", { chef_id: chefId })
-      Alert.alert("Chef assigned", "Your selected chef has been assigned successfully.")
+      await api.post("chefs/assign/", { chef_id: chefId });
+      navigation.navigate("Subscription");
     } catch (err) {
-      Alert.alert("Unable to assign chef", err?.response?.data?.detail || "Please try again.")
+      Alert.alert(
+        "Unable to assign chef",
+        err?.response?.data?.detail || "Please try again.",
+      );
     } finally {
-      setBusyId(null)
+      setBusyId(null);
     }
-  }
+  };
 
   const requestInstantChef = async () => {
     try {
-      const permission = await Location.requestForegroundPermissionsAsync()
+      const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert("Location required", "Instant chef requests need your location.")
-        return
+        Alert.alert(
+          "Location required",
+          "Instant chef requests need your location.",
+        );
+        return;
       }
-      const current = await Location.getCurrentPositionAsync({})
+      const current = await Location.getCurrentPositionAsync({});
       const res = await api.post("chefs/instant/request/", {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
-      })
-      setInstantRequest(res.data)
-      await writeCachedValue("chefs:instant:latest", res.data)
+      });
+      setInstantRequest(res.data);
+      await writeCachedValue("chefs:instant:latest", res.data);
     } catch (err) {
-      Alert.alert("Unable to request instant chef", err?.response?.data?.detail || "Please try again.")
+      Alert.alert(
+        "Unable to request instant chef",
+        err?.response?.data?.detail || "Please try again.",
+      );
     }
-  }
+  };
 
   if (loading) {
-    return <Screen><LoadingState label="Finding nearby chefs..." /></Screen>
+    return (
+      <Screen>
+        <LoadingState label="Finding nearby chefs..." />
+      </Screen>
+    );
   }
 
   return (
     <Screen>
-      <ImageBackground source={{ uri: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80" }} style={styles.heroCard} imageStyle={styles.heroImage}>
+      <ImageBackground
+        source={{
+          uri: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80",
+        }}
+        style={styles.heroCard}
+        imageStyle={styles.heroImage}
+      >
         <View style={styles.heroOverlay}>
           <Text style={styles.heroEyebrow}>Chef discovery</Text>
-          <Text style={styles.heroTitle}>Choose a chef who fits your taste and schedule.</Text>
+          <Text style={styles.heroTitle}>
+            Choose a chef who fits your taste and schedule.
+          </Text>
           <Text style={styles.heroSubtitle}>{locationLabel}</Text>
           <View style={styles.heroMeta}>
-            <Pill label={meals.length ? joinMeals(meals) : "No active meal plan"} tone="warm" />
+            <Pill
+              label={meals.length ? joinMeals(meals) : "No active meal plan"}
+              tone="warm"
+            />
           </View>
         </View>
       </ImageBackground>
@@ -150,9 +199,13 @@ export function FindChefScreen() {
       <SectionCard style={styles.sectionCard}>
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Instant chef</Text>
-          <Text style={styles.sectionLink} onPress={() => load(false)}>Refresh</Text>
+          <Text style={styles.sectionLink} onPress={() => load(false)}>
+            Refresh
+          </Text>
         </View>
-        <Text style={styles.sectionSubtitle}>Request the nearest available chef for immediate service.</Text>
+        <Text style={styles.sectionSubtitle}>
+          Request the nearest available chef for immediate service.
+        </Text>
         <View style={styles.actions}>
           <Button label="Request instant chef" onPress={requestInstantChef} />
         </View>
@@ -163,11 +216,19 @@ export function FindChefScreen() {
                 <Ionicons name="flash" size={18} color={palette.accent} />
               </View>
               <View>
-                <Text style={styles.rowTitle}>Request #{instantRequest.id}</Text>
-                <Text style={styles.rowMeta}>Status: {titleCase(instantRequest.status)}</Text>
+                <Text style={styles.rowTitle}>
+                  Request #{instantRequest.id}
+                </Text>
+                <Text style={styles.rowMeta}>
+                  Status: {titleCase(instantRequest.status)}
+                </Text>
               </View>
             </View>
-            {instantRequest.status_message ? <Text style={styles.rowMeta}>{instantRequest.status_message}</Text> : null}
+            {instantRequest.status_message ? (
+              <Text style={styles.rowMeta}>
+                {instantRequest.status_message}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </SectionCard>
@@ -176,47 +237,78 @@ export function FindChefScreen() {
         <Text style={styles.sectionTitle}>Available chefs</Text>
         <Text style={styles.sectionSubtitleInline}>{chefs.length} results</Text>
       </View>
-      <Text style={styles.sectionSubtitle}>Clearer cards, stronger hierarchy, and more relevant meal-oriented presentation.</Text>
+      <Text style={styles.sectionSubtitle}>
+        Clearer cards, stronger hierarchy, and more relevant meal-oriented
+        presentation.
+      </Text>
 
       <SectionCard style={styles.listShell}>
         <View style={styles.list}>
-          {chefs.length ? chefs.map((chef) => (
-            <View key={chef.id} style={styles.chefCard}>
-              <ImageBackground source={{ uri: "https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?auto=format&fit=crop&w=1200&q=80" }} style={styles.chefImage} imageStyle={styles.chefImageInner}>
-                <View style={styles.chefImageOverlay}>
-                  <Pill label={chef.is_available ? "Available" : "Busy"} tone={chef.is_available ? "good" : "warm"} />
-                </View>
-              </ImageBackground>
+          {chefs.length ? (
+            chefs.map((chef) => (
+              <View key={chef.id} style={styles.chefCard}>
+                <ImageBackground
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?auto=format&fit=crop&w=1200&q=80",
+                  }}
+                  style={styles.chefImage}
+                  imageStyle={styles.chefImageInner}
+                >
+                  <View style={styles.chefImageOverlay}>
+                    <Pill
+                      label={chef.is_available ? "Available" : "Busy"}
+                      tone={chef.is_available ? "good" : "warm"}
+                    />
+                  </View>
+                </ImageBackground>
 
-              <View style={styles.chefHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{chef.name}</Text>
-                  <Text style={styles.rowMeta}>{chef.speciality}</Text>
+                <View style={styles.chefHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{chef.name}</Text>
+                    <Text style={styles.rowMeta}>{chef.speciality}</Text>
+                  </View>
+                  <View style={styles.ratingPill}>
+                    <Ionicons name="star" size={13} color={palette.accent} />
+                    <Text style={styles.ratingText}>{chef.rating || 4.5}</Text>
+                  </View>
                 </View>
-                <View style={styles.ratingPill}>
-                  <Ionicons name="star" size={13} color={palette.accent} />
-                  <Text style={styles.ratingText}>{chef.rating || 4.5}</Text>
+
+                <View style={styles.metaChips}>
+                  {chef.distance_km ? (
+                    <Pill
+                      label={`${chef.distance_km} km away`}
+                      tone="neutral"
+                    />
+                  ) : null}
+                  <Pill label="Home-style cooking" tone="neutral" />
+                </View>
+
+                <View style={styles.chefFooter}>
+                  <View style={styles.deliveryHint}>
+                    <MaterialCommunityIcons
+                      name="chef-hat"
+                      size={16}
+                      color={palette.primary}
+                    />
+                    <Text style={styles.deliveryHintText}>
+                      Recommended for daily meals
+                    </Text>
+                  </View>
+                  <Button
+                    label={busyId === chef.id ? "Assigning..." : "Assign chef"}
+                    onPress={() => assignChef(chef.id)}
+                    loading={busyId === chef.id}
+                  />
                 </View>
               </View>
-
-              <View style={styles.metaChips}>
-                {chef.distance_km ? <Pill label={`${chef.distance_km} km away`} tone="neutral" /> : null}
-                <Pill label="Home-style cooking" tone="neutral" />
-              </View>
-
-              <View style={styles.chefFooter}>
-                <View style={styles.deliveryHint}>
-                  <MaterialCommunityIcons name="chef-hat" size={16} color={palette.primary} />
-                  <Text style={styles.deliveryHintText}>Recommended for daily meals</Text>
-                </View>
-                <Button label={busyId === chef.id ? "Assigning..." : "Assign chef"} onPress={() => assignChef(chef.id)} loading={busyId === chef.id} />
-              </View>
-            </View>
-          )) : <Text style={typography.body}>No chefs available right now.</Text>}
+            ))
+          ) : (
+            <Text style={typography.body}>No chefs available right now.</Text>
+          )}
         </View>
       </SectionCard>
     </Screen>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -238,6 +330,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.76)",
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold",
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
@@ -246,6 +339,7 @@ const styles = StyleSheet.create({
     fontSize: 29,
     lineHeight: 33,
     fontWeight: "900",
+    fontFamily: "NunitoSans_800ExtraBold",
     color: palette.white,
     maxWidth: 250,
   },
@@ -270,12 +364,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold",
     color: palette.text,
   },
   sectionLink: {
     fontSize: 13,
     color: palette.primary,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold",
   },
   sectionSubtitle: {
     marginTop: 6,
@@ -287,6 +383,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: palette.muted,
     fontWeight: "700",
+    fontFamily: "NunitoSans_700Bold",
   },
   actions: {
     marginTop: 14,
@@ -363,6 +460,7 @@ const styles = StyleSheet.create({
   ratingText: {
     color: palette.text,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold",
     fontSize: 12,
   },
   metaChips: {
@@ -382,14 +480,16 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 13,
     fontWeight: "600",
+    fontFamily: "NunitoSans_600SemiBold",
   },
   rowTitle: {
     fontSize: 16,
     fontWeight: "700",
+    fontFamily: "NunitoSans_700Bold",
     color: palette.text,
   },
   rowMeta: {
     fontSize: 13,
     color: palette.muted,
   },
-})
+});

@@ -1,3 +1,4 @@
+import AuthShell from "../components/common/AuthShell"
 import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
@@ -49,7 +50,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-cream)] flex items-center justify-center px-4">
+    <AuthShell partner={false}>
       <div className="w-full max-w-md bg-white p-8 rounded-2xl border border-[var(--color-border)] shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-[var(--color-text)]">Welcome back</h2>
@@ -100,6 +101,6 @@ export default function Login() {
           </Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   )
 }

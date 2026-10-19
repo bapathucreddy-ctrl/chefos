@@ -1,9 +1,17 @@
 from django.contrib import admin
 from .models import  Subscription, ChefAssignment, Feedback, PaymentTransaction
+from .models import ChefPricingProfile
 from chef.models import Chef, InstantChefOffer, InstantChefRequest, InstantOrderHistory, ServiceOtpSession, UserChef
 from django.contrib.auth import get_user_model
 from menu.models import UserPreference,WeeklyMenu
 User = get_user_model()
+
+
+@admin.register(ChefPricingProfile)
+class ChefPricingProfileAdmin(admin.ModelAdmin):
+    list_display = ("chef", "subscriber_ratings", "tenure_months", "meals_served", "certified_specialty", "updated_at")
+    readonly_fields = ("updated_at",)
+    search_fields = ("chef__name",)
 
 @admin.register(Chef)
 class ChefAdmin(admin.ModelAdmin):

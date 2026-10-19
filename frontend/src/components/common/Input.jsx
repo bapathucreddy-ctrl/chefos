@@ -1,3 +1,5 @@
+import { useId } from "react"
+
 export default function Input({
   label,
   type = "text",
@@ -7,16 +9,21 @@ export default function Input({
   required = false,
   error = "",
   helper = "",
+  minLength,
 }) {
+  const id = useId()
   return (
     <div className="flex flex-col gap-2">
       {label && (
-        <label className="text-sm font-semibold text-[var(--color-text)]">
+        <label htmlFor={id} className="text-sm font-semibold text-[var(--color-text)]">
           {label}
         </label>
       )}
 
       <input
+        id={id}
+        aria-invalid={Boolean(error)}
+        minLength={minLength}
         type={type}
         placeholder={placeholder}
         value={value}

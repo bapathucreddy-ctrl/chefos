@@ -1,3 +1,4 @@
+import AuthShell from "../components/common/AuthShell"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
@@ -70,7 +71,7 @@ export default function ChefPartnerRegister() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-cream)] flex items-center justify-center px-4 py-8">
+    <AuthShell partner>
       <div className="w-full max-w-2xl bg-white p-8 rounded-2xl border border-[var(--color-border)] shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
         <h1 className="text-2xl font-semibold text-[var(--color-text)]">Create Chef Partner Account</h1>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
@@ -106,6 +107,6 @@ export default function ChefPartnerRegister() {
           Already registered? <Link to="/chef/login" className="text-[var(--color-primary)] font-medium hover:underline">Login as chef partner</Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   )
 }

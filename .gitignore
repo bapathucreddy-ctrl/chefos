@@ -1,14 +1,21 @@
 node_modules/
+.tools/
 __pycache__/
 *.py[cod]
 .Python
 .env
 .env.*
+!.env.example
 venv/
 .venv/
 env/
 
 dist/
+dist-chef/
+dist-reference/
+supabase/.temp/
+supabase/backups/
+supabase/imports/
 build/
 .expo/
 .expo-shared/

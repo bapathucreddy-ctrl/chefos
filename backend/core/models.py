@@ -40,10 +40,26 @@ class Subscription(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     price = models.IntegerField(default=0)
+    pricing_snapshot = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.meal_type}"
+
+
+class ChefPricingProfile(models.Model):
+    """Verified monthly rate-card inputs, maintained by operations, never clients."""
+    chef = models.OneToOneField(Chef, on_delete=models.CASCADE, related_name="pricing_profile")
+    subscriber_ratings = models.PositiveIntegerField(default=0)
+    tenure_months = models.PositiveIntegerField(default=0)
+    meals_served = models.PositiveIntegerField(default=0)
+    certified_specialty = models.BooleanField(default=False)
+    pilot_rate = models.PositiveIntegerField(null=True, blank=True)
+    pilot_started_at = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Pricing: {self.chef}"
 
 
 class ChefAssignment(models.Model):

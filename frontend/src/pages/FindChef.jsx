@@ -13,7 +13,7 @@ const RADIUS_KM = 5
 
 const chefIcon = L.divIcon({
   className: "chef-map-icon",
-  html: '<div style="width:34px;height:34px;border-radius:999px;background:#ffffff;border:2px solid #0f7a5e;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 6px 14px rgba(0,0,0,.2)">👨‍🍳</div>',
+  html: '<div style="width:34px;height:34px;border-radius:999px;background:#ffffff;border:2px solid #14213D;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 6px 14px rgba(0,0,0,.2)">👨‍🍳</div>',
   iconSize: [34, 34],
   iconAnchor: [17, 34],
   popupAnchor: [0, -30],
@@ -66,10 +66,10 @@ export default function FindChef() {
       const start = new Date(activeSubscription.start_date)
       const end = new Date(activeSubscription.end_date)
       const days = Math.round((end - start) / (1000 * 60 * 60 * 24))
-      return days <= 8 ? "weekly" : "monthly"
+      return activeSubscription?.pricing?.plan_cycle || (days <= 8 ? "weekly" : days >= 80 ? "quarterly" : "monthly")
     }
     return "monthly"
-  }, [plan?.plan_cycle, activeSubscription?.start_date, activeSubscription?.end_date])
+  }, [plan?.plan_cycle, activeSubscription?.start_date, activeSubscription?.end_date, activeSubscription?.pricing?.plan_cycle])
   const preferredMealWave = useMemo(() => {
     const fromPlan = plan?.meal_wave
     if (fromPlan && typeof fromPlan === "object") return fromPlan
@@ -329,7 +329,7 @@ export default function FindChef() {
               ) : null}
 
               {instantReq?.status === "accepted" && acceptedChef ? (
-                <div className="mt-4 rounded-lg border border-[rgba(15,122,94,0.2)] bg-white px-3 py-3">
+                <div className="mt-4 rounded-lg border border-[rgba(16,36,66,0.2)] bg-white px-3 py-3">
                   <p className="text-sm font-semibold text-[var(--color-text)]">
                     Chef accepted: <span className="text-[var(--color-primary)]">{acceptedChef.chef_name}</span>
                   </p>
@@ -364,7 +364,7 @@ export default function FindChef() {
                             [trackingData.chefLat, trackingData.chefLng],
                             [trackingData.userLat, trackingData.userLng],
                           ]}
-                          pathOptions={{ color: "#0f7a5e", weight: 4 }}
+                          pathOptions={{ color: "#14213D", weight: 4 }}
                         />
                         <Marker position={[trackingData.chefLat, trackingData.chefLng]} icon={chefIcon}>
                           <Popup>Chef location</Popup>
@@ -379,7 +379,7 @@ export default function FindChef() {
                   )}
 
                   {serviceSession ? (
-                    <div className="mt-3 rounded-lg border border-[rgba(15,122,94,0.2)] bg-[linear-gradient(165deg,#f3fbf7_0%,#f9fffd_100%)] p-3">
+                    <div className="mt-3 rounded-lg border border-[rgba(16,36,66,0.2)] bg-[linear-gradient(165deg,#f3fbf7_0%,#f9fffd_100%)] p-3">
                       <p className="text-xs uppercase tracking-[0.12em] text-[var(--color-muted)]">Service OTP</p>
                       {serviceSession?.status === "start_otp_generated" ? (
                         <>
@@ -425,7 +425,7 @@ export default function FindChef() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <MapRecenter userLocation={userLocation} />
-                <Circle center={[userLocation.lat, userLocation.lng]} radius={RADIUS_KM * 1000} pathOptions={{ color: "#0f7a5e", fillOpacity: 0.1 }} />
+                <Circle center={[userLocation.lat, userLocation.lng]} radius={RADIUS_KM * 1000} pathOptions={{ color: "#14213D", fillOpacity: 0.1 }} />
 
                 <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
                   <Popup>Your current location</Popup>

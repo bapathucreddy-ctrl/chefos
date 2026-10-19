@@ -1,58 +1,44 @@
-import axios from "axios"
-import Constants from "expo-constants"
+import { requireSupabase } from "./supabase";
+import { markCacheOwner } from "./cache";
 
-let authAccessor = () => ({ accessToken: "", refreshToken: "", role: null })
-let logoutHandler = async () => {}
-
-const apiBaseUrl =
-  process.env.EXPO_PUBLIC_API_BASE_URL ||
-  Constants.expoConfig?.extra?.apiBaseUrl ||
-  "http://192.168.94.68:8000/api/"
-
-export const api = axios.create({
-  baseURL: apiBaseUrl,
-})
-
-export function configureApi({ getAuthState, onLogout }) {
-  authAccessor = getAuthState
-  logoutHandler = onLogout
+async function request(method, path, body, options = {}) {
+  const client = requireSupabase();
+  const {
+    data: { session },
+  } = await client.auth.getSession();
+  const owner = session?.user?.id;
+  const { data, error } = await client.functions.invoke("chefos-api", {
+    body: {
+      method,
+      path: path.replace(/^\/+|\/+$/g, ""),
+      data: body || {},
+      params: options.params || {},
+    },
+  });
+  if (error || data?.error) {
+    let payload = data;
+    let status = error?.context?.status || data?.status || 400;
+    if (error?.context instanceof Response) {
+      try {
+        payload = await error.context.json();
+      } catch {}
+    }
+    const failure = new Error(
+      payload?.detail || error?.message || "Unable to complete this request.",
+    );
+    failure.response = { status, data: payload || { detail: failure.message } };
+    throw failure;
+  }
+  markCacheOwner(data, owner);
+  return { data, status: 200 };
 }
 
-api.interceptors.request.use((config) => {
-  const { accessToken } = authAccessor()
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`
-  }
-  return config
-})
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const original = error.config
-    if (error.response?.status === 401 && !original?._retry) {
-      const { refreshToken } = authAccessor()
-      if (!refreshToken) {
-        await logoutHandler()
-        return Promise.reject(error)
-      }
-      original._retry = true
-      try {
-        const res = await axios.post(`${apiBaseUrl}token/refresh/`, { refresh: refreshToken })
-        const current = authAccessor()
-        await current.setSession?.({
-          role: current.role,
-          accessToken: res.data.access,
-          refreshToken,
-          username: current.username,
-        })
-        original.headers.Authorization = `Bearer ${res.data.access}`
-        return api(original)
-      } catch (refreshError) {
-        await logoutHandler()
-        return Promise.reject(refreshError)
-      }
-    }
-    return Promise.reject(error)
-  }
-)
+// Compatibility boundary for the native screens. Auth and business requests now
+// go to Supabase; no Django URL or JWT refresh endpoint remains on this path.
+export const api = {
+  get: (path, options) => request("GET", path, null, options),
+  post: (path, data, options) => request("POST", path, data, options),
+  patch: (path, data, options) => request("PATCH", path, data, options),
+  put: (path, data, options) => request("PUT", path, data, options),
+  delete: (path, options) => request("DELETE", path, null, options),
+};

@@ -151,7 +151,7 @@ export default function MealSchedule() {
           <div className="grid lg:grid-cols-[1.24fr_0.76fr]">
             <div className="relative min-h-[320px]">
               <img src={upcomingHeroImage} alt="Upcoming meal" className="absolute inset-0 h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[rgba(12,30,23,0.84)] via-[rgba(12,30,23,0.56)] to-[rgba(12,30,23,0.22)]" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[rgba(12,30,56,0.84)] via-[rgba(12,30,56,0.56)] to-[rgba(12,30,56,0.22)]" />
 
               <div className="relative h-full p-6 md:p-8 flex flex-col justify-between">
                 <div>
@@ -173,7 +173,7 @@ export default function MealSchedule() {
               </div>
             </div>
 
-            <div className="p-5 md:p-6 bg-[linear-gradient(165deg,#f4fbf7_0%,#ecf5ff_100%)] border-l border-[rgba(17,33,26,0.1)]">
+            <div className="p-5 md:p-6 bg-[linear-gradient(165deg,#f2f5fa_0%,#ecf5ff_100%)] border-l border-[rgba(17,33,26,0.1)]">
               <img src={upcomingHeroImage} alt="Upcoming meal preview" className="h-36 w-full rounded-2xl object-cover soft-border" />
 
               <div className="mt-4 grid gap-3">
@@ -208,7 +208,7 @@ export default function MealSchedule() {
         {!loading && today && (
           <>
             {tracking ? (
-              <section className="mt-8 panel p-5 border border-[rgba(15,122,94,0.24)] bg-[linear-gradient(165deg,#ecfaf3_0%,#f7fffb_100%)]">
+              <section className="mt-8 panel p-5 border border-[rgba(16,36,66,0.24)] bg-[linear-gradient(165deg,#ecfaf3_0%,#f7fffb_100%)]">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Chef Live Tracking</h2>
                 <p className="mt-1 text-sm text-[var(--color-muted)] capitalize">
                   {tracking.meal} • Distance {tracking.distanceKm} km • ETA {tracking.etaMin} min
@@ -226,7 +226,7 @@ export default function MealSchedule() {
             ) : null}
 
             {Array.isArray(today?.doorstep_alerts) && today.doorstep_alerts.length > 0 ? (
-              <section className="mt-8 panel p-5 border border-[rgba(15,122,94,0.24)] bg-[linear-gradient(165deg,#ecfaf3_0%,#f7fffb_100%)]">
+              <section className="mt-8 panel p-5 border border-[rgba(16,36,66,0.24)] bg-[linear-gradient(165deg,#ecfaf3_0%,#f7fffb_100%)]">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Live Arrival Update</h2>
                 <div className="mt-3 space-y-2">
                   {today.doorstep_alerts.map((alert, idx) => (
@@ -239,7 +239,7 @@ export default function MealSchedule() {
             ) : null}
 
             {!!serviceRows.length && (
-              <section className="mt-8 panel p-6 border border-[rgba(15,122,94,0.2)] bg-[linear-gradient(165deg,#f2fbf7_0%,#f8fffd_100%)]">
+              <section className="mt-8 panel p-6 border border-[rgba(16,36,66,0.2)] bg-[linear-gradient(165deg,#f2fbf7_0%,#f8fffd_100%)]">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Service OTP</h2>
                 <p className="mt-1 text-sm text-[var(--color-muted)]">Share this OTP with your chef when they start or complete your service.</p>
                 <div className="mt-4 grid md:grid-cols-2 gap-4">
@@ -251,7 +251,7 @@ export default function MealSchedule() {
             )}
 
             {today?.upcoming_order ? (
-              <section className="mt-8 panel p-6 border border-[rgba(15,122,94,0.2)] bg-[linear-gradient(165deg,#f4fbf7_0%,#f8fffd_100%)]">
+              <section className="mt-8 panel p-6 border border-[rgba(16,36,66,0.2)] bg-[linear-gradient(165deg,#f2f5fa_0%,#f8fffd_100%)]">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Upcoming Order</h2>
                 <p className="mt-1 text-sm text-[var(--color-muted)] capitalize">
                   {today.upcoming_order.meal} {today.upcoming_order.time ? `• ${today.upcoming_order.time}` : ""}
@@ -298,7 +298,7 @@ function OtpCard({ session }) {
       : "Service has started."
 
   return (
-    <div className="rounded-2xl border border-[rgba(15,122,94,0.2)] bg-white p-4">
+    <div className="rounded-2xl border border-[rgba(16,36,66,0.2)] bg-white p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--color-text)] capitalize">
           {session?.meal || "Instant"} {session?.wave ? `• ${session.wave}` : ""}

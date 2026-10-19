@@ -1,6 +1,13 @@
 import { StyleSheet, Text, View } from "react-native"
 
-import { Button, Hero, Pill, Screen, SectionCard, SectionHeader } from "../components/ui"
+import {
+  Button,
+  Hero,
+  Pill,
+  Screen,
+  SectionCard,
+  SectionHeader
+} from "../components/ui"
 import { palette, typography } from "../theme"
 
 export function WelcomeScreen({ navigation }) {
@@ -17,10 +24,20 @@ export function WelcomeScreen({ navigation }) {
       </Hero>
 
       <SectionCard>
-        <SectionHeader title="Choose your experience" subtitle="The app is structured like a polished platform product, not a generic delivery app, so each role gets a more focused workflow." />
+        <SectionHeader
+          title="Choose your experience"
+          subtitle="The app is structured like a polished platform product, not a generic delivery app, so each role gets a more focused workflow."
+        />
         <View style={styles.actions}>
-          <Button label="Continue as Customer" onPress={() => navigation.navigate("Auth", { role: "user" })} />
-          <Button label="Chef Partner Login" variant="secondary" onPress={() => navigation.navigate("Auth", { role: "chef" })} />
+          <Button
+            label="Continue as Customer"
+            onPress={() => navigation.navigate("Auth", { role: "user" })}
+          />
+          <Button
+            label="Chef Partner Login"
+            variant="secondary"
+            onPress={() => navigation.navigate("Auth", { role: "chef" })}
+          />
         </View>
       </SectionCard>
 
@@ -28,13 +45,15 @@ export function WelcomeScreen({ navigation }) {
         <SectionCard style={styles.gridCard}>
           <Text style={typography.cardTitle}>Customer product</Text>
           <Text style={[typography.body, styles.copy]}>
-            Chef discovery, weekly planning, schedule tracking, and subscription management in a cleaner, more product-led interface.
+            Chef discovery, weekly planning, schedule tracking, and subscription
+            management in a cleaner, more product-led interface.
           </Text>
         </SectionCard>
         <SectionCard style={styles.gridCard}>
           <Text style={typography.cardTitle}>Partner operations</Text>
           <Text style={[typography.body, styles.copy]}>
-            Availability controls, instant response workflows, service visibility, and fast operational actions for chef partners.
+            Availability controls, instant response workflows, service
+            visibility, and fast operational actions for chef partners.
           </Text>
         </SectionCard>
       </View>
@@ -45,15 +64,15 @@ export function WelcomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   actions: {
     marginTop: 18,
-    gap: 12,
+    gap: 12
   },
   grid: {
-    gap: 16,
+    gap: 16
   },
   gridCard: {
-    backgroundColor: palette.surfaceAlt,
+    backgroundColor: palette.surfaceAlt
   },
   copy: {
-    marginTop: 10,
-  },
+    marginTop: 10
+  }
 })

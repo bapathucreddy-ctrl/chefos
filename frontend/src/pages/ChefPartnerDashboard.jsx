@@ -599,7 +599,7 @@ export default function ChefPartnerDashboard() {
         {error && <PageState kind="error" title="Action required" message={error} />}
         {locationError && <PageState kind="error" title="Location update issue" message={locationError} />}
 
-        <section className="rounded-3xl border border-[rgba(15,122,94,0.15)] bg-[linear-gradient(135deg,#0f7a5e_0%,#1b5f8f_62%,#eea35a_100%)] text-white p-6 md:p-8 shadow-[0_16px_40px_rgba(15,122,94,0.2)]">
+        <section className="rounded-3xl border border-[rgba(16,36,66,0.15)] bg-[linear-gradient(135deg,#14213D_0%,#1b5f8f_62%,#eea35a_100%)] text-white p-6 md:p-8 shadow-[0_16px_40px_rgba(16,36,66,0.2)]">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/80">Partner Operations</p>
@@ -627,7 +627,7 @@ export default function ChefPartnerDashboard() {
           </Card>
         </section>
 
-        <section className="panel p-6 border border-[rgba(15,122,94,0.16)] shadow-[0_14px_30px_rgba(20,35,28,0.08)]">
+        <section className="panel p-6 border border-[rgba(16,36,66,0.16)] shadow-[0_14px_30px_rgba(20,35,28,0.08)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-muted)]">Availability Control</p>
@@ -665,7 +665,7 @@ export default function ChefPartnerDashboard() {
           ) : (
             <div className="mt-4 grid gap-3">
               {instantOffers.map((offer) => (
-                <div key={offer.offer_id} className="rounded-xl border border-[rgba(15,122,94,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
+                <div key={offer.offer_id} className="rounded-xl border border-[rgba(16,36,66,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-[var(--color-text)]">@{offer.username}</p>
@@ -686,7 +686,7 @@ export default function ChefPartnerDashboard() {
               <p className="text-sm font-semibold text-[var(--color-text)]">Accepted Instant Orders</p>
               <div className="mt-3 grid gap-3">
                 {acceptedInstantOrders.map((req) => (
-                  <div key={req.request_id} className="rounded-xl border border-[rgba(15,122,94,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
+                  <div key={req.request_id} className="rounded-xl border border-[rgba(16,36,66,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-semibold text-[var(--color-text)]">@{req.username}</p>
@@ -708,7 +708,7 @@ export default function ChefPartnerDashboard() {
           {!upcomingOrder ? (
             <p className="mt-3 text-sm text-[var(--color-muted)]">No upcoming order in the near window.</p>
           ) : (
-            <div className="mt-3 rounded-xl border border-[rgba(15,122,94,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
+            <div className="mt-3 rounded-xl border border-[rgba(16,36,66,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold text-[var(--color-text)]">
@@ -776,7 +776,7 @@ export default function ChefPartnerDashboard() {
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Service OTP Verification</h2>
           <p className="mt-1 text-sm text-[var(--color-muted)]">Start and complete service with customer OTP verification.</p>
           {currentBooking?.can_start_otp_now ? (
-            <div className="mt-4 rounded-xl border border-[rgba(15,122,94,0.12)] bg-[rgba(15,122,94,0.04)] p-3">
+            <div className="mt-4 rounded-xl border border-[rgba(16,36,66,0.12)] bg-[rgba(16,36,66,0.04)] p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--color-muted)]">Current Booking</p>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-[var(--color-text)]">
@@ -806,7 +806,7 @@ export default function ChefPartnerDashboard() {
           ) : (
             <div className="mt-4 grid gap-3">
               {serviceSessions.map((session) => (
-                <div key={session.id} className="rounded-xl border border-[rgba(15,122,94,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
+                <div key={session.id} className="rounded-xl border border-[rgba(16,36,66,0.14)] p-4 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf9_100%)]">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-[var(--color-text)]">

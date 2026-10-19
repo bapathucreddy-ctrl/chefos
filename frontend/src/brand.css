@@ -1,0 +1,544 @@
+.chef-brand {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+  font-size: 40px;
+  font-weight: 850;
+  letter-spacing: -2px;
+  line-height: 1;
+  position: relative;
+}
+.brand-c {
+  display: inline-block;
+  position: relative;
+  font-size: 1.16em;
+  font-weight: 900;
+  letter-spacing: -0.1em;
+}
+.brand-c > svg {
+  position: absolute;
+  width: 0.68em;
+  height: 0.54em;
+  left: 0.02em;
+  top: -0.26em;
+  transform: rotate(-14deg);
+}
+.brand-rest {
+  padding-left: 0.06em;
+}
+.brand-dot {
+  color: #F2B134;
+  padding-left: 1px;
+}
+.brand-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    #14213D 0%,
+    #14213D 65%,
+    #08162c 100%
+  );
+  color: #fff;
+  overflow: hidden;
+  animation: splash-exit 0.4s 3s ease forwards;
+}
+.brand-splash .chef-brand {
+  font-size: 74px;
+  filter: drop-shadow(0 5px 15px #ffffff14);
+  z-index: 2;
+}
+.brand-splash .brand-c {
+  animation: c-arrive 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.brand-splash .brand-c > svg {
+  animation: hat-drop 0.9s 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.3) both;
+}
+.brand-splash .brand-rest {
+  animation: word-reveal 0.8s 1.4s ease both;
+}
+.brand-splash > p {
+  font-size: 8px;
+  letter-spacing: 4px;
+  color: #b7c3d4;
+  margin-top: 26px;
+  animation: word-reveal 0.7s 2s ease both;
+}
+.splash-line {
+  position: absolute;
+  bottom: 35px;
+  width: 90px;
+  height: 3px;
+  background: white;
+  border-radius: 5px;
+  opacity: 0.7;
+}
+.splash-orbit {
+  position: absolute;
+  border: 1px solid #ffffff10;
+  border-radius: 50%;
+  width: 380px;
+  height: 380px;
+  animation: orbit-in 1s 1.9s both;
+}
+.orbit-one {
+  border-left-color: #F2B134;
+  transform: rotate(25deg);
+}
+.orbit-two {
+  width: 480px;
+  height: 480px;
+  border-right-color: #F2B13455;
+  animation-delay: 2.1s;
+}
+.orbit-three {
+  width: 600px;
+  height: 600px;
+  animation-delay: 2.3s;
+}
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #fafbfc;
+}
+.auth-story {
+  background: #14213D;
+  color: white;
+  padding: 50px 60px 30px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.auth-brand {
+  color: #fff;
+  align-self: flex-start;
+}
+.auth-story-copy {
+  margin: auto 0;
+  padding: 55px 0 35px;
+  max-width: 430px;
+}
+.auth-eyebrow {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #F2B134;
+}
+.auth-story h1 {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 58px;
+  font-weight: 500;
+  line-height: 1.14;
+  letter-spacing: -1.5px;
+  margin: 21px 0;
+}
+.auth-story h1 em {
+  color: #F2B134;
+  font-weight: 500;
+}
+.auth-story-copy > p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #a6b5cc;
+  max-width: 340px;
+}
+.auth-story img {
+  height: 200px;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 20px;
+  margin: 25px 0 20px;
+  box-shadow: 0 8px 30px #0002;
+}
+.auth-story-trust {
+  font-size: 10px;
+  color: #c3ccdb;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.auth-story-trust svg {
+  color: #F2B134;
+}
+.auth-story-footer {
+  font-size: 9px;
+  color: #7386a1;
+  letter-spacing: 1px;
+}
+.auth-form-side {
+  padding: 50px 50px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.auth-form-side > div.bg-white {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 30px 0 !important;
+}
+.auth-back {
+  position: absolute;
+  top: 40px;
+  left: 45px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #8794a6;
+}
+.auth-back svg {
+  transform: rotate(180deg);
+}
+.auth-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #929aa7;
+  margin-top: 20px;
+}
+.auth-switch a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #182e50;
+  font-weight: 600;
+}
+.auth-mobile-brand {
+  display: none;
+}
+.auth-form-side h2,
+.auth-form-side h1 {
+  font-size: 29px;
+  letter-spacing: -1px;
+}
+.auth-form-side input {
+  height: 50px;
+  background: #eef1f5;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.auth-form-side input:focus {
+  background: white;
+  border-color: #c3a361;
+  box-shadow: 0 0 0 3px #F2B13419;
+}
+.auth-form-side form > button {
+  height: 49px;
+  margin-top: 9px;
+  background: #F2B134;
+  color: #172b49;
+  border: 0;
+  box-shadow: none;
+}
+.auth-form-side form > button:hover {
+  background: #e3af43;
+}
+.auth-form-side label {
+  font-size: 11px;
+  color: #66758a;
+}
+.auth-form-side form {
+  gap: 20px;
+}
+.app-navbar {
+  position: sticky;
+  top: 0;
+  background: #14213D;
+  color: white;
+  z-index: 30;
+  box-shadow: 0 3px 20px #08172c15;
+}
+.app-navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 23px;
+  padding-bottom: 23px;
+  gap: 30px;
+}
+.app-navbar .chef-brand {
+  font-size: 29px;
+}
+.app-navbar nav {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: auto;
+  scrollbar-width: none;
+}
+.app-navbar nav a {
+  color: #9fafc5;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 9px 13px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.app-navbar nav a:hover {
+  color: white;
+  background: #ffffff0c;
+}
+.app-navbar nav a.active {
+  background: #F2B134;
+  color: #122641;
+  font-weight: 700;
+}
+.navbar-account {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #b0bdd0;
+}
+.navbar-account button {
+  color: #e5bf70;
+  font-size: 10px;
+  background: none;
+  border: 1px solid #ffffff24;
+  border-radius: 7px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+@keyframes c-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes hat-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-160px) rotate(-14deg);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(4px) rotate(-9deg);
+  }
+  82% {
+    transform: translateY(-8px) rotate(-18deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(-14deg);
+  }
+}
+@keyframes word-reveal {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-7px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translateX(0);
+  }
+}
+@keyframes orbit-in {
+  from {
+    opacity: 0;
+    scale: 0.85;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes splash-exit {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (max-width: 900px) {
+  .auth-story {
+    padding: 45px 35px 25px;
+  }
+  .auth-story h1 {
+    font-size: 45px;
+  }
+  .auth-form-side {
+    padding: 50px 30px 25px;
+  }
+  .app-navbar-inner {
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .app-navbar nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+  .navbar-account {
+    margin-left: auto;
+  }
+  .app-navbar-inner {
+    padding-top: 17px;
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 650px) {
+  .auth-shell {
+    display: flex;
+    flex-direction: column;
+  }
+  .auth-story {
+    padding: 34px 27px 30px;
+    border-radius: 0 0 30px 30px;
+    min-height: 240px;
+  }
+  .auth-story-copy {
+    padding: 29px 0 0;
+    max-width: 100%;
+    position: relative;
+  }
+  .auth-story h1 {
+    font-size: 34px;
+    position: relative;
+    z-index: 1;
+    margin: 11px 0;
+  }
+  .auth-story-copy > p,
+  .auth-story-trust,
+  .auth-story-footer {
+    display: none;
+  }
+  .auth-story .chef-brand {
+    font-size: 30px;
+  }
+  .auth-eyebrow {
+    font-size: 6px;
+    letter-spacing: 1.6px;
+    position: relative;
+    z-index: 1;
+  }
+  .auth-story img {
+    position: absolute;
+    right: -60px;
+    bottom: -65px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    margin: 0;
+    opacity: 0.5;
+    box-shadow: none;
+    transform: rotate(10deg);
+  }
+  .auth-form-side {
+    padding: 55px 30px 25px;
+    justify-content: flex-start;
+    min-height: calc(100dvh - 240px);
+  }
+  .auth-form-side > div.bg-white {
+    padding: 0 !important;
+  }
+  .auth-back {
+    top: 23px;
+    left: 30px;
+    font-size: 9px;
+  }
+  .auth-form-side h2,
+  .auth-form-side h1 {
+    font-size: 25px;
+  }
+  .auth-switch {
+    margin-top: 35px;
+    font-size: 9px;
+  }
+  .brand-splash .chef-brand {
+    font-size: 58px;
+  }
+  .splash-orbit {
+    width: 300px;
+    height: 300px;
+  }
+  .orbit-two {
+    width: 400px;
+    height: 400px;
+  }
+  .orbit-three {
+    width: 500px;
+    height: 500px;
+  }
+  .navbar-account > span {
+    display: none;
+  }
+  .app-navbar nav {
+    justify-content: flex-start;
+  }
+  .app-navbar nav a {
+    font-size: 10px;
+    padding: 8px 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-splash,
+  .brand-splash * {
+    animation: none !important;
+  }
+  .brand-splash {
+    display: none;
+  }
+}
+
+/* The logo asset preserves the rounded lettering and chef hat of the reference. */
+.asset-brand {
+  width: 3.6em;
+  height: 1.2em;
+  display: inline-block;
+  vertical-align: middle;
+  letter-spacing: normal;
+}
+.asset-brand > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.asset-brand.compact {
+  width: 1em;
+}
+.brand-splash .logo-c-piece {
+  animation: c-arrive 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.brand-splash .logo-hat-piece {
+  animation: logo-hat-arrive 0.9s 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.3) both;
+}
+.brand-splash .logo-word-piece {
+  animation: word-reveal 0.8s 1.4s ease both;
+}
+@keyframes logo-hat-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(-260px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(16px);
+  }
+  82% {
+    transform: translateY(-18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

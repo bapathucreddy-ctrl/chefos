@@ -1,0 +1,32 @@
+project_id = "chefos"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["chefos-user://auth/confirm", "chefos-chef://auth/confirm", "chefos-user://reset-password", "chefos-chef://reset-password", "http://localhost:5173/auth/callback"]
+enable_signup = true
+minimum_password_length = 8
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[functions.chefos-api]
+# The handler verifies bearer tokens using Auth.getUser, including asymmetric
+# signing keys. Only health/pricing-catalog routes allow anonymous requests.
+verify_jwt = false
+
+[functions.chefos-payments-webhook]
+# Verified using the payment provider's HMAC signature over the raw body.
+verify_jwt = false

@@ -12,6 +12,7 @@
     "init-tailwind": "tailwindcss init -p"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "axios": "^1.13.4",
     "leaflet": "^1.9.4",
     "react": "^19.2.0",

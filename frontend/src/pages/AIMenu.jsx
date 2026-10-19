@@ -204,7 +204,7 @@ export default function AIMenu() {
               </div>
             </div>
 
-            <div className="relative rounded-2xl min-h-[220px] soft-border p-5 bg-[linear-gradient(140deg,#0f7a5e_0%,#1b5f8f_52%,#e98f3f_100%)] text-white flex flex-col justify-between">
+            <div className="relative rounded-2xl min-h-[220px] soft-border p-5 bg-[linear-gradient(140deg,#14213D_0%,#1b5f8f_52%,#F2B134_100%)] text-white flex flex-col justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-white/80">Plan Intelligence</p>
                 <h3 className="mt-2 text-xl font-bold">Adaptive Nutrition Engine</h3>
@@ -231,7 +231,7 @@ export default function AIMenu() {
               <p className="mt-2 text-[var(--color-muted)]">Select duration and meal slots before generating your plan.</p>
 
               <div className="mt-6 grid sm:grid-cols-2 gap-4">
-                <SelectField label="Plan cycle" value={planCycle} onChange={setPlanCycle} options={["weekly", "monthly"]} />
+                <SelectField label="Plan cycle" value={planCycle} onChange={setPlanCycle} options={["weekly", "monthly", "quarterly"]} />
                 <Input
                   label="Number of people"
                   type="number"

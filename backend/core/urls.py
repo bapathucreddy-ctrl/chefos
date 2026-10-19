@@ -15,12 +15,16 @@ from .views import (
     scheduling_capacity_check,
     payment_create_order,
     subscription_price_preview,
+    pricing_catalog,
+    instant_price_preview,
     payment_verify,
 )
 
 from .views import assign_chef
 
 urlpatterns = [
+    path('pricing/', pricing_catalog),
+    path('pricing/instant-preview/', instant_price_preview),
     path('register/', create_user,name='register'),
     # path('chefs/', list_chefs),
     path('subscriptions/create/', create_subscription),

@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useState } from "react"
-import { ImageBackground, StyleSheet, Text, View } from "react-native"
+import {
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native"
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
 import * as Location from "expo-location"
 
 import { useAuth } from "../auth/AuthContext"
 import { api } from "../api/client"
 import { readCachedValue, writeCachedValue } from "../api/cache"
-import { Button, LoadingState, Pill, Screen, SectionCard } from "../components/ui"
+import {
+  Button,
+  LoadingState,
+  Pill,
+  Screen,
+  SectionCard
+} from "../components/ui"
 import { inferPlanCycle, joinMeals, safeArray } from "../utils/format"
 import { palette, typography } from "../theme"
 
@@ -21,15 +33,19 @@ export function UserHomeScreen({ navigation }) {
   const [subscription, setSubscription] = useState(null)
   const [today, setToday] = useState(null)
   const [addressTitle, setAddressTitle] = useState("Fetching location")
-  const [addressSubtitle, setAddressSubtitle] = useState("Allow location to personalize delivery")
+  const [addressSubtitle, setAddressSubtitle] = useState(
+    "Allow location to personalize delivery"
+  )
 
   const load = async (soft = false) => {
     if (!soft) setLoading(true)
     try {
       const [cachedChef, cachedSubscription, cachedToday] = await Promise.all([
         readCachedValue("chefs:assigned", { maxAgeMs: DASHBOARD_CACHE_TTL_MS }),
-        readCachedValue("subscription:active", { maxAgeMs: DASHBOARD_CACHE_TTL_MS }),
-        readCachedValue("menu:today", { maxAgeMs: TODAY_CACHE_TTL_MS }),
+        readCachedValue("subscription:active", {
+          maxAgeMs: DASHBOARD_CACHE_TTL_MS
+        }),
+        readCachedValue("menu:today", { maxAgeMs: TODAY_CACHE_TTL_MS })
       ])
 
       if (cachedChef) setAssignedChef(cachedChef?.chef || null)
@@ -40,7 +56,7 @@ export function UserHomeScreen({ navigation }) {
       const [chefRes, subRes, todayRes] = await Promise.allSettled([
         api.get("chefs/assigned/"),
         api.get("subscription/active/"),
-        api.get("menu/today/"),
+        api.get("menu/today/")
       ])
       if (chefRes.status === "fulfilled") {
         setAssignedChef(chefRes.value.data.chef)
@@ -68,17 +84,24 @@ export function UserHomeScreen({ navigation }) {
 
     const setResolvedAddress = async () => {
       try {
-        const cachedLocation = await readCachedValue("location:current-address", { maxAgeMs: LOCATION_CACHE_TTL_MS })
+        const cachedLocation = await readCachedValue(
+          "location:current-address",
+          { maxAgeMs: LOCATION_CACHE_TTL_MS }
+        )
         if (cachedLocation && !cancelled) {
           setAddressTitle(cachedLocation.title || "Current location")
-          setAddressSubtitle(cachedLocation.subtitle || "Using your live location")
+          setAddressSubtitle(
+            cachedLocation.subtitle || "Using your live location"
+          )
         }
 
         const permission = await Location.requestForegroundPermissionsAsync()
         if (permission.status !== "granted") {
           if (!cancelled) {
             setAddressTitle("Location unavailable")
-            setAddressSubtitle("Enable location access to show your current area")
+            setAddressSubtitle(
+              "Enable location access to show your current area"
+            )
           }
           return
         }
@@ -91,27 +114,26 @@ export function UserHomeScreen({ navigation }) {
         let secondaryLabel = ""
 
         try {
-          const url =
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+          const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
           const response = await fetch(url, {
             headers: {
-              Accept: "application/json",
-            },
+              Accept: "application/json"
+            }
           })
           const payload = await response.json()
           const address = payload?.address || {}
           primaryLabel = String(
             address.suburb ||
-            address.neighbourhood ||
-            address.quarter ||
-            address.village ||
-            address.town ||
-            address.city ||
-            ""
+              address.neighbourhood ||
+              address.quarter ||
+              address.village ||
+              address.town ||
+              address.city ||
+              ""
           ).trim()
           secondaryLabel = [
             address.city || address.county || address.state_district,
-            address.state,
+            address.state
           ]
             .map((item) => String(item || "").trim())
             .filter(Boolean)
@@ -123,9 +145,17 @@ export function UserHomeScreen({ navigation }) {
         }
 
         if (!primaryLabel) {
-          const places = await Location.reverseGeocodeAsync({ latitude, longitude })
+          const places = await Location.reverseGeocodeAsync({
+            latitude,
+            longitude
+          })
           const first = Array.isArray(places) ? places[0] : null
-          primaryLabel = String(first?.district || first?.subregion || first?.city || "Current location").trim()
+          primaryLabel = String(
+            first?.district ||
+              first?.subregion ||
+              first?.city ||
+              "Current location"
+          ).trim()
           secondaryLabel = [first?.city, first?.region]
             .map((item) => String(item || "").trim())
             .filter(Boolean)
@@ -139,7 +169,7 @@ export function UserHomeScreen({ navigation }) {
         }
         await writeCachedValue("location:current-address", {
           title: primaryLabel || "Current location",
-          subtitle: secondaryLabel || "Using your live location",
+          subtitle: secondaryLabel || "Using your live location"
         })
       } catch {
         if (!cancelled) {
@@ -165,22 +195,32 @@ export function UserHomeScreen({ navigation }) {
   const featuredCards = [
     {
       title: "Chef discovery",
-      subtitle: assignedChef ? `${assignedChef.name} is already assigned` : "Browse nearby chefs and assign in minutes",
-      image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80",
+      subtitle: assignedChef
+        ? `${assignedChef.name} is already assigned`
+        : "Browse nearby chefs and assign in minutes",
+      image:
+        "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80",
       action: "Explore",
-      route: "Discover",
+      route: "Discover"
     },
     {
       title: "Weekly plan",
-      subtitle: subscription ? joinMeals(subscription.meal_type) : "Build a weekly plan around your lifestyle",
-      image: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1200&q=80",
+      subtitle: subscription
+        ? joinMeals(subscription.meal_type)
+        : "Build a weekly plan around your lifestyle",
+      image:
+        "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1200&q=80",
       action: "Open menu",
-      route: "Menu",
-    },
+      route: "Menu"
+    }
   ]
 
   if (loading) {
-    return <Screen><LoadingState label="Loading your mobile dashboard..." /></Screen>
+    return (
+      <Screen>
+        <LoadingState label="Loading your mobile dashboard..." />
+      </Screen>
+    )
   }
 
   return (
@@ -189,62 +229,138 @@ export function UserHomeScreen({ navigation }) {
         <View>
           <Text style={styles.deliveryLabel}>Deliver to</Text>
           <View style={styles.deliveryRow}>
-            <Text style={styles.username} numberOfLines={1}>{addressTitle}</Text>
+            <Text style={styles.username} numberOfLines={1}>
+              {addressTitle}
+            </Text>
             <Ionicons name="chevron-down" size={16} color={palette.text} />
           </View>
-          <Text style={styles.deliverySubtitle} numberOfLines={1}>{addressSubtitle}</Text>
+          <Text style={styles.deliverySubtitle} numberOfLines={1}>
+            {addressSubtitle}
+          </Text>
         </View>
         <View style={styles.locationBadge}>
-          <Ionicons name="person-circle-outline" size={18} color={palette.primary} />
+          <Ionicons
+            name="person-circle-outline"
+            size={18}
+            color={palette.primary}
+          />
         </View>
       </View>
 
-      <View style={styles.searchBar}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Search chefs and cuisines"
+        onPress={() => navigation.navigate("Discover")}
+        style={styles.searchBar}
+      >
         <Ionicons name="search" size={18} color={palette.muted} />
-        <Text style={styles.searchText}>Search chefs, cuisines, or meal plans</Text>
-      </View>
+        <Text style={styles.searchText}>
+          Search chefs, cuisines, or meal plans
+        </Text>
+      </Pressable>
 
-      <ImageBackground source={{ uri: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80" }} style={styles.heroCard} imageStyle={styles.heroImage}>
+      <ImageBackground
+        source={require("../assets/meal-hero.jpg")}
+        style={styles.heroCard}
+        imageStyle={styles.heroImage}
+      >
         <View style={styles.heroOverlay}>
           <Text style={styles.heroEyebrow}>Chefos Premium</Text>
-          <Text style={styles.heroTitle}>Home-style meals with your own trusted chef.</Text>
-          <Text style={styles.heroSubtitle}>Discover chefs, lock your weekly plan, and stay on top of every meal from one app.</Text>
+          <Text style={styles.heroTitle}>
+            Home-style meals with your own trusted chef.
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Discover chefs, lock your weekly plan, and stay on top of every meal
+            from one app.
+          </Text>
           <View style={styles.heroButtons}>
-            <Button label="Find chefs" onPress={() => navigation.navigate("Discover")} style={styles.heroButton} />
-            <Button label="See menu" variant="outline" onPress={() => navigation.navigate("Menu")} style={styles.heroButtonAlt} />
+            <Button
+              label="Find chefs"
+              onPress={() => navigation.navigate("Discover")}
+              style={styles.heroButton}
+            />
+            <Button
+              label="See menu"
+              variant="outline"
+              onPress={() => navigation.navigate("Menu")}
+              style={styles.heroButtonAlt}
+            />
           </View>
         </View>
       </ImageBackground>
 
       <View style={styles.kpiRow}>
-        <MetricChip icon="account-tie" label="Assigned Chef" value={assignedChef?.name || "Pending"} />
-        <MetricChip icon="silverware-fork-knife" label="Meal Plan" value={subscription ? joinMeals(subscription.meal_type) : "Inactive"} />
+        <MetricChip
+          icon="account-tie"
+          label="Assigned Chef"
+          value={assignedChef?.name || "Pending"}
+        />
+        <MetricChip
+          icon="silverware-fork-knife"
+          label="Meal Plan"
+          value={subscription ? joinMeals(subscription.meal_type) : "Inactive"}
+        />
       </View>
 
       <SectionCard style={styles.sectionCard}>
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Quick picks</Text>
-          <Text style={styles.sectionLink} onPress={() => navigation.navigate("Discover")}>See all</Text>
+          <Text
+            style={styles.sectionLink}
+            onPress={() => navigation.navigate("Discover")}
+          >
+            See all
+          </Text>
         </View>
         <View style={styles.quickGrid}>
-          <QuickAction icon="search" label="Find Chef" onPress={() => navigation.navigate("Discover")} />
-          <QuickAction icon="restaurant" label="Weekly Menu" onPress={() => navigation.navigate("Menu")} />
-          <QuickAction icon="receipt" label="Today Plan" onPress={() => navigation.navigate("Today")} />
-          <QuickAction icon="wallet" label="Subscription" onPress={() => navigation.navigate("Subscription")} />
+          <QuickAction
+            icon="search"
+            label="Find Chef"
+            onPress={() => navigation.navigate("Discover")}
+          />
+          <QuickAction
+            icon="restaurant"
+            label="Weekly Menu"
+            onPress={() => navigation.navigate("Menu")}
+          />
+          <QuickAction
+            icon="receipt"
+            label="Today Plan"
+            onPress={() => navigation.navigate("Today")}
+          />
+          <QuickAction
+            icon="wallet"
+            label="Subscription"
+            onPress={() => navigation.navigate("Subscription")}
+          />
         </View>
       </SectionCard>
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Featured for you</Text>
-        <Text style={styles.sectionLink} onPress={() => navigation.navigate("Menu")}>Browse</Text>
+        <Text
+          style={styles.sectionLink}
+          onPress={() => navigation.navigate("Menu")}
+        >
+          Browse
+        </Text>
       </View>
       <View style={styles.featuredStack}>
         {featuredCards.map((item) => (
-          <ImageBackground key={item.title} source={{ uri: item.image }} style={styles.featuredCard} imageStyle={styles.featuredImage}>
+          <ImageBackground
+            key={item.title}
+            source={{ uri: item.image }}
+            style={styles.featuredCard}
+            imageStyle={styles.featuredImage}
+          >
             <View style={styles.featuredOverlay}>
               <Text style={styles.featuredTitle}>{item.title}</Text>
               <Text style={styles.featuredSubtitle}>{item.subtitle}</Text>
-              <Button label={item.action} onPress={() => navigation.navigate(item.route)} style={styles.featuredButton} />
+              <Button
+                label={item.action}
+                onPress={() => navigation.navigate(item.route)}
+                style={styles.featuredButton}
+              />
             </View>
           </ImageBackground>
         ))}
@@ -253,28 +369,53 @@ export function UserHomeScreen({ navigation }) {
       <SectionCard style={styles.sectionCard}>
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Today’s status</Text>
-          <Text style={styles.sectionLink} onPress={() => load(true)}>Refresh</Text>
+          <Text style={styles.sectionLink} onPress={() => load(true)}>
+            Refresh
+          </Text>
         </View>
         <View style={styles.chips}>
-          {mealChips.length ? mealChips.map((meal) => <Pill key={meal} label={meal} tone="neutral" />) : <Text style={typography.body}>No meals selected yet.</Text>}
+          {mealChips.length ? (
+            mealChips.map((meal) => (
+              <Pill key={meal} label={meal} tone="neutral" />
+            ))
+          ) : (
+            <Text style={typography.body}>No meals selected yet.</Text>
+          )}
         </View>
         <View style={styles.todaySummary}>
-          <Text style={styles.todayDish}>{today?.upcoming_order?.dish || "No upcoming meal scheduled"}</Text>
-          <Text style={styles.todayMeta}>{subscription ? `${inferPlanCycle(subscription)} plan active` : "Set up your first plan to unlock scheduling"}</Text>
+          <Text style={styles.todayDish}>
+            {today?.upcoming_order?.dish || "No upcoming meal scheduled"}
+          </Text>
+          <Text style={styles.todayMeta}>
+            {subscription
+              ? `${inferPlanCycle(subscription)} plan active`
+              : "Set up your first plan to unlock scheduling"}
+          </Text>
         </View>
-        {serviceOtps.length ? serviceOtps.map((item) => (
-          <View key={item.service_session_id || `${item.meal}-${item.status}`} style={styles.liveRow}>
-            <View style={styles.liveIcon}>
-              <MaterialCommunityIcons name="chef-hat" size={18} color={palette.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{item.meal || "Service"}</Text>
-              <Text style={styles.rowMeta}>
-                {item.status} {item.start_otp ? `• Start OTP ${item.start_otp}` : ""} {item.end_otp ? `• End OTP ${item.end_otp}` : ""}
-              </Text>
-            </View>
-          </View>
-        )) : null}
+        {serviceOtps.length
+          ? serviceOtps.map((item) => (
+              <View
+                key={item.service_session_id || `${item.meal}-${item.status}`}
+                style={styles.liveRow}
+              >
+                <View style={styles.liveIcon}>
+                  <MaterialCommunityIcons
+                    name="chef-hat"
+                    size={18}
+                    color={palette.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{item.meal || "Service"}</Text>
+                  <Text style={styles.rowMeta}>
+                    {item.status}{" "}
+                    {item.start_otp ? `• Start OTP ${item.start_otp}` : ""}{" "}
+                    {item.end_otp ? `• End OTP ${item.end_otp}` : ""}
+                  </Text>
+                </View>
+              </View>
+            ))
+          : null}
       </SectionCard>
 
       <SectionCard style={styles.logoutCard}>
@@ -291,7 +432,9 @@ function QuickAction({ icon, label, onPress }) {
         <Ionicons name={icon} size={20} color={palette.primary} />
       </View>
       <Text style={styles.quickLabel}>{label}</Text>
-      <Text onPress={onPress} style={styles.quickLink}>Open</Text>
+      <Text onPress={onPress} style={styles.quickLink}>
+        Open
+      </Text>
     </View>
   )
 }
@@ -312,38 +455,40 @@ function MetricChip({ icon, label, value }) {
 
 const styles = StyleSheet.create({
   content: {
-    gap: 18,
+    gap: 18
   },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 4,
+    paddingTop: 4
   },
   deliveryLabel: {
     fontSize: 13,
     color: palette.muted,
     fontWeight: "700",
+    fontFamily: "NunitoSans_700Bold"
   },
   deliveryRow: {
     marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    maxWidth: 220,
+    maxWidth: 220
   },
   username: {
     fontSize: 24,
     lineHeight: 28,
     color: palette.text,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold"
   },
   deliverySubtitle: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 17,
     color: palette.muted,
-    maxWidth: 240,
+    maxWidth: 240
   },
   locationBadge: {
     alignItems: "center",
@@ -353,7 +498,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: 18,
     width: 42,
-    height: 42,
+    height: 42
   },
   searchBar: {
     flexDirection: "row",
@@ -364,32 +509,33 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingVertical: 15
   },
   searchText: {
     color: palette.muted,
-    fontSize: 14,
+    fontSize: 14
   },
   heroCard: {
     minHeight: 250,
     borderRadius: 28,
-    overflow: "hidden",
+    overflow: "hidden"
   },
   heroImage: {
-    borderRadius: 28,
+    borderRadius: 28
   },
   heroOverlay: {
     flex: 1,
     justifyContent: "flex-end",
     padding: 22,
-    backgroundColor: "rgba(14,29,22,0.34)",
+    backgroundColor: "rgba(12,30,56,0.75)"
   },
   heroEyebrow: {
     fontSize: 12,
     color: "rgba(255,255,255,0.78)",
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold",
     textTransform: "uppercase",
-    letterSpacing: 1.2,
+    letterSpacing: 1.2
   },
   heroTitle: {
     marginTop: 8,
@@ -397,29 +543,30 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     color: palette.white,
     fontWeight: "900",
-    maxWidth: 260,
+    fontFamily: "NunitoSans_800ExtraBold",
+    maxWidth: 260
   },
   heroSubtitle: {
     marginTop: 10,
     fontSize: 14,
     lineHeight: 20,
     color: "rgba(255,255,255,0.88)",
-    maxWidth: 290,
+    maxWidth: 290
   },
   heroButtons: {
     marginTop: 16,
     flexDirection: "row",
-    gap: 10,
+    gap: 10
   },
   heroButton: {
-    flex: 1,
+    flex: 1
   },
   heroButtonAlt: {
-    flex: 1,
+    flex: 1
   },
   kpiRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 12
   },
   metricCard: {
     flex: 1,
@@ -430,7 +577,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   metricIconWrap: {
     width: 40,
@@ -438,43 +585,47 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#edf7f2",
+    backgroundColor: "#edf7f2"
   },
   metricLabel: {
     fontSize: 12,
     color: palette.muted,
     fontWeight: "700",
+    fontFamily: "NunitoSans_700Bold"
   },
   metricValue: {
     marginTop: 4,
     fontSize: 14,
     color: palette.text,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold"
   },
   sectionCard: {
     paddingTop: 18,
-    paddingBottom: 18,
+    paddingBottom: 18
   },
   sectionHead: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "center"
   },
   sectionTitle: {
     fontSize: 20,
     color: palette.text,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold"
   },
   sectionLink: {
     fontSize: 13,
     color: palette.primary,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold"
   },
   quickGrid: {
     marginTop: 16,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 12
   },
   quickCard: {
     width: "47%",
@@ -482,7 +633,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 18,
-    padding: 14,
+    padding: 14
   },
   quickIconWrap: {
     width: 42,
@@ -490,75 +641,79 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#edf7f2",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   quickLabel: {
     marginTop: 12,
     fontSize: 14,
     fontWeight: "800",
-    color: palette.text,
+    fontFamily: "NunitoSans_800ExtraBold",
+    color: palette.text
   },
   quickLink: {
     marginTop: 8,
     fontSize: 12,
     color: palette.primary,
     fontWeight: "800",
+    fontFamily: "NunitoSans_800ExtraBold"
   },
   featuredStack: {
-    gap: 14,
+    gap: 14
   },
   featuredCard: {
     minHeight: 170,
     borderRadius: 24,
-    overflow: "hidden",
+    overflow: "hidden"
   },
   featuredImage: {
-    borderRadius: 24,
+    borderRadius: 24
   },
   featuredOverlay: {
     flex: 1,
     justifyContent: "flex-end",
     padding: 18,
-    backgroundColor: "rgba(0,0,0,0.28)",
+    backgroundColor: "rgba(0,0,0,0.28)"
   },
   featuredTitle: {
     fontSize: 22,
     lineHeight: 26,
     fontWeight: "900",
-    color: palette.white,
+    fontFamily: "NunitoSans_800ExtraBold",
+    color: palette.white
   },
   featuredSubtitle: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 19,
     color: "rgba(255,255,255,0.9)",
-    maxWidth: 250,
+    maxWidth: 250
   },
   featuredButton: {
     marginTop: 14,
     alignSelf: "flex-start",
-    minHeight: 44,
+    minHeight: 44
   },
   chips: {
     marginTop: 16,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 10
   },
   todaySummary: {
     marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 8
   },
   todayDish: {
     fontSize: 18,
     lineHeight: 24,
     fontWeight: "800",
-    color: palette.text,
+    fontFamily: "NunitoSans_800ExtraBold",
+    color: palette.text
   },
   todayMeta: {
     marginTop: 6,
     fontSize: 13,
-    color: palette.muted,
+    color: palette.muted
   },
   liveRow: {
     flexDirection: "row",
@@ -567,7 +722,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
+    borderTopColor: palette.border
   },
   liveIcon: {
     width: 40,
@@ -575,19 +730,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#edf7f2",
+    backgroundColor: "#edf7f2"
   },
   rowTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: palette.text,
+    fontFamily: "NunitoSans_700Bold",
+    color: palette.text
   },
   rowMeta: {
     marginTop: 4,
     fontSize: 13,
-    color: palette.muted,
+    color: palette.muted
   },
   logoutCard: {
-    marginBottom: 8,
-  },
+    marginBottom: 8
+  }
 })

@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css"
 
 const chefIcon = L.divIcon({
   className: "chef-map-icon",
-  html: '<div style="width:34px;height:34px;border-radius:999px;background:#ffffff;border:2px solid #0f7a5e;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 6px 14px rgba(0,0,0,.2)">👨‍🍳</div>',
+  html: '<div style="width:34px;height:34px;border-radius:999px;background:#ffffff;border:2px solid #14213D;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 6px 14px rgba(0,0,0,.2)">👨‍🍳</div>',
   iconSize: [34, 34],
   iconAnchor: [17, 34],
   popupAnchor: [0, -30],
@@ -126,7 +126,7 @@ export default function LiveTrackMap({ chefLat, chefLng, userLat, userLng, heigh
           onClick={() => setFollowChef((prev) => !prev)}
           className={`rounded-lg px-3 py-1.5 text-xs font-semibold border shadow ${
             followChef
-              ? "bg-[#0f7a5e] text-white border-[#0f7a5e]"
+              ? "bg-[#14213D] text-white border-[#14213D]"
               : "bg-white/95 text-[var(--color-text)] border-[var(--color-border)]"
           }`}
         >
@@ -153,7 +153,7 @@ export default function LiveTrackMap({ chefLat, chefLng, userLat, userLng, heigh
           followChef={followChef}
           recenterTick={recenterTick}
         />
-        <Polyline positions={polyline} pathOptions={{ color: "#0f7a5e", weight: 5 }} />
+        <Polyline positions={polyline} pathOptions={{ color: "#14213D", weight: 5 }} />
         <Marker position={[animatedChefPos[0], animatedChefPos[1]]} icon={chefIcon}>
           <Popup>Chef live location</Popup>
         </Marker>

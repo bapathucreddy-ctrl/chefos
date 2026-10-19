@@ -6,6 +6,7 @@ from .models import ChefAssignment
 from django.contrib.auth import get_user_model
 from chef.models import Chef
 from menu.models import UserPreference,WeeklyMenu
+from .pricing import customer_quote
 User = get_user_model()
 
 class ChefAssignmentSerializer(serializers.ModelSerializer):
@@ -26,9 +27,14 @@ class ChefSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
+    pricing = serializers.SerializerMethodField()
+
+    def get_pricing(self, obj):
+        return customer_quote(obj.pricing_snapshot) if obj.pricing_snapshot else None
+
     class Meta:
         model = Subscription
-        fields = '__all__'
+        exclude = ['pricing_snapshot']
 
         # def validate_meal_type(self, value):
         #     allowed = {'breakfast', 'lunch', 'dinner'}

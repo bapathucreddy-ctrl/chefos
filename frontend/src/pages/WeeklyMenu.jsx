@@ -84,7 +84,7 @@ export default function WeeklyMenu() {
               </div>
             </div>
 
-            <div className="relative min-h-[330px] bg-[linear-gradient(165deg,#f4fbf7_0%,#ecf5ff_100%)] p-5 md:p-6 border-l border-[rgba(17,33,26,0.1)]">
+            <div className="relative min-h-[330px] bg-[linear-gradient(165deg,#f2f5fa_0%,#ecf5ff_100%)] p-5 md:p-6 border-l border-[rgba(17,33,26,0.1)]">
               <img src={SIDE_IMAGE_URL} alt="Prepared healthy meals" className="h-36 w-full rounded-2xl object-cover soft-border" />
 
               <div className="mt-4 grid gap-3">
@@ -145,7 +145,7 @@ export default function WeeklyMenu() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] border-collapse">
                 <thead>
-                  <tr className="bg-[rgba(15,122,94,0.06)] text-left">
+                  <tr className="bg-[rgba(16,36,66,0.06)] text-left">
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-[var(--color-muted)]">Day</th>
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-[var(--color-muted)]">Breakfast</th>
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-[var(--color-muted)]">Lunch</th>

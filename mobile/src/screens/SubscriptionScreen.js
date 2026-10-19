@@ -1,197 +1,397 @@
-import { useEffect, useMemo, useState } from "react"
-import { Alert, StyleSheet, Text, View } from "react-native"
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { api } from "../api/client";
+import { openCheckout } from "../api/checkout";
+import { useAuth } from "../auth/AuthContext";
+import {
+  Button,
+  Hero,
+  Input,
+  LoadingState,
+  Pill,
+  Screen,
+  SectionCard,
+  SectionHeader,
+} from "../components/ui";
+import { palette, typography } from "../theme";
+import { currencyInr, titleCase } from "../utils/format";
+import { slotLabel } from "../utils/slots";
 
-import { api } from "../api/client"
-import { readCachedValue, writeCachedValue } from "../api/cache"
-import { Button, Hero, LoadingState, Pill, Screen, SectionCard, SectionHeader } from "../components/ui"
-import { currencyInr, inferPlanCycle, joinMeals, safeArray, titleCase } from "../utils/format"
-import { typography } from "../theme"
-
-const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000
-const PREFERENCE_CACHE_TTL_MS = 10 * 60 * 1000
-const PRICE_PREVIEW_CACHE_TTL_MS = 3 * 60 * 1000
-
-export function SubscriptionScreen() {
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [assignedChef, setAssignedChef] = useState(null)
-  const [preference, setPreference] = useState(null)
-  const [menu, setMenu] = useState(null)
-  const [subscription, setSubscription] = useState(null)
-  const [pricePreview, setPricePreview] = useState(null)
-
-  const load = async () => {
-    setLoading(true)
+const MEALS = ["breakfast", "lunch", "dinner"];
+export function SubscriptionScreen({ navigation }) {
+  const { session } = useAuth(),
+    user = session?.user;
+  const [chef, setChef] = useState(null),
+    [subscription, setSubscription] = useState(null),
+    [loading, setLoading] = useState(true);
+  const [people, setPeople] = useState("3"),
+    [cycle, setCycle] = useState("monthly"),
+    [meals, setMeals] = useState(["lunch"]),
+    [waves, setWaves] = useState({
+      breakfast: "B2",
+      lunch: "L2",
+      dinner: "D2",
+    });
+  const [quote, setQuote] = useState(null),
+    [quoteBusy, setQuoteBusy] = useState(false),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [pending, setPending] = useState(null);
+  const pendingKey = `chefos:pending-order:${user?.id}`;
+  const load = useCallback(async () => {
     try {
-      const [cachedChef, cachedPreference, cachedMenu, cachedSubscription, cachedPricePreview] = await Promise.all([
-        readCachedValue("chefs:assigned", { maxAgeMs: DASHBOARD_CACHE_TTL_MS }),
-        readCachedValue("menu:preference", { maxAgeMs: PREFERENCE_CACHE_TTL_MS }),
-        readCachedValue("menu:weekly", { maxAgeMs: DASHBOARD_CACHE_TTL_MS }),
-        readCachedValue("subscription:active", { maxAgeMs: DASHBOARD_CACHE_TTL_MS }),
-        readCachedValue("subscriptions:price-preview", { maxAgeMs: PRICE_PREVIEW_CACHE_TTL_MS }),
-      ])
-
-      if (cachedChef) setAssignedChef(cachedChef?.chef || null)
-      if (cachedPreference) setPreference(cachedPreference)
-      if (cachedMenu) setMenu(cachedMenu)
-      if (cachedSubscription) setSubscription(cachedSubscription)
-      if (cachedPricePreview) setPricePreview(cachedPricePreview)
-      if (cachedChef || cachedPreference || cachedMenu || cachedSubscription || cachedPricePreview) {
-        setLoading(false)
-      }
-
-      const [chefRes, prefRes, menuRes, subRes] = await Promise.allSettled([
+      const [assigned, active, saved] = await Promise.all([
         api.get("chefs/assigned/"),
-        api.get("menu/preference/"),
-        api.get("menu/weekly/"),
         api.get("subscription/active/"),
-      ])
-      const nextPreference = prefRes.status === "fulfilled" ? prefRes.value.data : null
-      const nextSubscription = subRes.status === "fulfilled" ? subRes.value.data : null
-      if (chefRes.status === "fulfilled") {
-        setAssignedChef(chefRes.value.data.chef)
-        await writeCachedValue("chefs:assigned", chefRes.value.data)
-      }
-      if (nextPreference) {
-        setPreference(nextPreference)
-        await writeCachedValue("menu:preference", nextPreference)
-      }
-      if (menuRes.status === "fulfilled") {
-        setMenu(menuRes.value.data)
-        await writeCachedValue("menu:weekly", menuRes.value.data)
-      }
-      if (nextSubscription) {
-        setSubscription(nextSubscription)
-        await writeCachedValue("subscription:active", nextSubscription)
-      }
-
-      const mealType = safeArray(nextSubscription?.meal_type)
-      if (mealType.length) {
-        const preview = await api.get("subscriptions/price-preview/", {
-          params: {
-            meal_type: mealType.join(","),
-            plan_cycle: inferPlanCycle(nextSubscription).toLowerCase() || "monthly",
-            people_count: nextPreference?.people_count || 1,
-          },
-        })
-        setPricePreview(preview.data)
-        await writeCachedValue("subscriptions:price-preview", preview.data)
-      } else {
-        setPricePreview(null)
-      }
-    } catch {
-      setPricePreview(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  const summary = useMemo(() => {
-    const selectedMeals = safeArray(subscription?.meal_type)
-    return {
-      meals: joinMeals(selectedMeals),
-      cycle: inferPlanCycle(subscription) || "Pending",
-      people: preference?.people_count || 1,
-      cuisine: preference?.cuisine_style || "Not set",
-      goal: preference?.goal || "Not set",
-      chef: assignedChef?.name || "Not assigned",
-    }
-  }, [subscription, preference, assignedChef])
-
-  const createOrder = async () => {
-    if (!subscription?.meal_type?.length || !assignedChef?.id) {
-      Alert.alert("Missing data", "Assign a chef and activate a plan before creating an order.")
-      return
-    }
-    setBusy(true)
-    try {
-      const res = await api.post("payments/create-order/", {
-        subscription_payload: {
-          chef: assignedChef.id,
-          meal_type: subscription.meal_type,
-          meal_wave: subscription.meal_wave || {},
-          people_count: preference?.people_count || 1,
-          plan_cycle: inferPlanCycle(subscription).toLowerCase() || "monthly",
-        },
-      })
-      Alert.alert(
-        "Order created",
-        `Backend order ${res.data.order_id} is ready. Native Razorpay SDK wiring is the next step to finish in-app checkout.`
-      )
+        AsyncStorage.getItem(pendingKey),
+      ]);
+      setChef(assigned.data?.chef || null);
+      setSubscription(active.data);
+      setPending(saved);
+      setError("");
     } catch (err) {
-      Alert.alert("Unable to create order", err?.response?.data?.detail || "Please try again.")
+      setError(err.message);
     } finally {
-      setBusy(false)
+      setLoading(false);
+    }
+  }, [pendingKey]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setQuote(null);
+      if (!chef || !meals.length || !/^[1-8]$/.test(people)) {
+        setQuoteBusy(false);
+        return;
+      }
+      setQuoteBusy(true);
+      try {
+        const { data } = await api.get("subscriptions/price-preview/", {
+          params: {
+            chef: chef.id,
+            people_count: Number(people),
+            plan_cycle: cycle,
+            meal_type: meals.join(","),
+          },
+        });
+        if (!cancelled) {
+          setQuote({ ...data, chef_id: chef.id });
+          setError("");
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setQuoteBusy(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [chef, people, cycle, meals]);
+  async function recover() {
+    setBusy(true);
+    try {
+      await api.post("subscription/create/", { order_id: pending });
+      await AsyncStorage.removeItem(pendingKey);
+      setPending(null);
+      await load();
+      Alert.alert(
+        "Plan activated",
+        "Your payment and plan have been confirmed.",
+      );
+    } catch (err) {
+      Alert.alert("Payment status", err.message);
+    } finally {
+      setBusy(false);
     }
   }
-
-  if (loading) {
-    return <Screen><LoadingState label="Loading subscription studio..." /></Screen>
+  async function pay() {
+    if (!quoteMatches || busy) return;
+    setBusy(true);
+    try {
+      const { data: order } = await api.post("payments/create-order/", {
+        subscription_payload: {
+          chef: chef.id,
+          meal_type: meals,
+          meal_wave: waves,
+          people_count: Number(people),
+          plan_cycle: cycle,
+        },
+      });
+      await AsyncStorage.setItem(pendingKey, order.order_id);
+      setPending(order.order_id);
+      if (order.amount !== quote.amount_paise)
+        throw new Error(
+          "Your service price has changed. Review the updated quote before continuing. This order has not been charged.",
+        );
+      const result = await openCheckout(order, user?.email);
+      await api.post("payments/verify/", result);
+      await AsyncStorage.removeItem(pendingKey);
+      setPending(null);
+      await load();
+      Alert.alert(
+        "Welcome to your plan",
+        "Your payment is confirmed. Your chef service and meal slots are now scheduled.",
+      );
+    } catch (err) {
+      Alert.alert(
+        "Checkout",
+        err?.description ||
+          err.message ||
+          "Payment was not completed. You can check your saved order below.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
-
+  const active = subscription?.is_active;
+  const quoteMatches =
+    quote &&
+    quote.chef_id === chef?.id &&
+    quote.people_count === Number(people) &&
+    quote.plan_cycle === cycle &&
+    quote.meal_count === meals.length;
+  if (loading)
+    return (
+      <Screen>
+        <LoadingState label="Preparing your plan..." />
+      </Screen>
+    );
   return (
     <Screen>
       <Hero
-        image="https://images.unsplash.com/photo-1466637574441-749b8f19452f?auto=format&fit=crop&w=1200&q=80"
-        eyebrow="Subscription"
-        title="Review the plan in a cleaner, product-style checkout flow."
-        subtitle="This screen translates your web confirmation experience into a more focused mobile subscription workspace."
+        eyebrow="YOUR CHEF, YOUR ROUTINE"
+        title={
+          active ? "A little care, every day." : "Make room for better meals."
+        }
+        subtitle="Choose your meals and let a trusted chef take care of the cooking."
       >
-        <Pill label={summary.chef} tone={assignedChef ? "good" : "warm"} />
-        <Pill label={`${summary.cycle} plan`} tone="neutral" />
+        <Pill
+          label={chef?.name || "Choose your chef"}
+          tone={chef ? "good" : "warm"}
+        />
       </Hero>
-
-      <SectionCard>
-        <SectionHeader eyebrow="Summary" title="Current subscription picture" />
-        <View style={styles.stack}>
-          <Text style={styles.line}>Chef: {summary.chef}</Text>
-          <Text style={styles.line}>Meals: {summary.meals}</Text>
-          <Text style={styles.line}>Cycle: {summary.cycle}</Text>
-          <Text style={styles.line}>People: {summary.people}</Text>
-          <Text style={styles.line}>Goal: {titleCase(summary.goal)}</Text>
-          <Text style={styles.line}>Cuisine: {titleCase(summary.cuisine)}</Text>
-        </View>
-      </SectionCard>
-
-      <SectionCard>
-        <SectionHeader eyebrow="Pricing" title="Server-backed preview" />
-        <Text style={styles.price}>{currencyInr(pricePreview?.price_inr || subscription?.price || 0)}</Text>
-        <Text style={[typography.body, { marginTop: 8 }]}>
-          This screen already calls your backend preview and order APIs. Native payment completion still needs Razorpay mobile SDK integration.
-        </Text>
-        <View style={{ marginTop: 16, gap: 12 }}>
-          <Button label={busy ? "Creating order..." : "Create backend order"} onPress={createOrder} loading={busy} />
-          <Button label="Refresh summary" variant="outline" onPress={load} />
-        </View>
-      </SectionCard>
-
-      <SectionCard>
-        <SectionHeader eyebrow="Menu context" title="What the plan is tied to" />
-        <Text style={typography.body}>
-          Latest weekly menu present: {menu ? "Yes" : "No"}.
-        </Text>
-      </SectionCard>
+      {error ? (
+        <SectionCard>
+          <Text accessibilityRole="alert" style={styles.error}>
+            {error}
+          </Text>
+          <Button label="Try again" variant="outline" onPress={load} />
+        </SectionCard>
+      ) : null}
+      {!chef ? (
+        <SectionCard>
+          <SectionHeader title="Find your kitchen companion" />
+          <Text style={typography.body}>
+            Choose an available chef before creating your meal plan.
+          </Text>
+          <Button
+            label="Discover chefs"
+            onPress={() => navigation.navigate("Discover")}
+          />
+        </SectionCard>
+      ) : null}
+      {active ? (
+        <SectionCard>
+          <SectionHeader
+            eyebrow="YOUR PAID PLAN"
+            title={`${titleCase(subscription.plan_cycle)} with ${chef?.name || "your chef"}`}
+          />
+          <Text style={styles.price}>{currencyInr(subscription.price)}</Text>
+          <Text style={typography.body}>
+            {subscription.meal_type.map(titleCase).join(", ")} ·{" "}
+            {subscription.people_count} people
+          </Text>
+          <Text style={typography.body}>
+            {subscription.start_date} to {subscription.end_date}
+          </Text>
+          <Pill label="Price locked until renewal" tone="good" />
+          <Text style={styles.note}>
+            Your chef and service rate are saved with this paid plan. Renew
+            after the plan ends.
+          </Text>
+        </SectionCard>
+      ) : chef ? (
+        <>
+          <SectionCard>
+            <SectionHeader
+              eyebrow="A PLAN THAT FITS"
+              title="Set your routine"
+            />
+            <View style={styles.stack}>
+              <Input
+                label="People at home (1–8)"
+                value={people}
+                onChangeText={setPeople}
+                keyboardType="number-pad"
+              />
+              <Text style={typography.label}>Plan duration</Text>
+              <View style={styles.choices}>
+                {["weekly", "monthly", "quarterly"].map((value) => (
+                  <Choice
+                    key={value}
+                    label={titleCase(value)}
+                    selected={cycle === value}
+                    onPress={() => setCycle(value)}
+                  />
+                ))}
+              </View>
+              <Text style={typography.label}>Daily meals</Text>
+              <View style={styles.choices}>
+                {MEALS.map((meal) => (
+                  <Choice
+                    key={meal}
+                    label={titleCase(meal)}
+                    selected={meals.includes(meal)}
+                    onPress={() =>
+                      setMeals((values) =>
+                        values.includes(meal)
+                          ? values.filter((x) => x !== meal)
+                          : [...values, meal],
+                      )
+                    }
+                  />
+                ))}
+              </View>
+              {meals.map((meal) => (
+                <View key={meal} style={styles.stack}>
+                  <Text style={typography.label}>
+                    {titleCase(meal)} service slot
+                  </Text>
+                  <View style={styles.choices}>
+                    {(chef.available_waves?.[meal] || []).map((wave) => (
+                      <Choice
+                        key={wave}
+                        label={slotLabel(wave)}
+                        selected={waves[meal] === wave}
+                        onPress={() =>
+                          setWaves((w) => ({ ...w, [meal]: wave }))
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </SectionCard>
+          <SectionCard>
+            <SectionHeader eyebrow="CLEAR PRICING" title="Your service quote" />
+            <Text style={styles.price}>
+              {quoteBusy
+                ? "Updating…"
+                : quote
+                  ? currencyInr(quote.price_inr)
+                  : "Select your plan"}
+            </Text>
+            {quoteMatches ? (
+              <>
+                <Text style={typography.body}>
+                  {currencyInr(quote.per_meal_inr)} per home per meal ·{" "}
+                  {quote.total_meals} meals · {quote.days} days
+                </Text>
+                <Text style={styles.note}>
+                  Before GST. Ingredients are provided by your household. Your
+                  final price is confirmed securely before payment.
+                </Text>
+              </>
+            ) : null}
+            <Button
+              label={busy ? "Opening checkout…" : "Continue to payment"}
+              disabled={
+                !quoteMatches ||
+                quoteBusy ||
+                !!pending ||
+                !meals.every((m) =>
+                  chef.available_waves?.[m]?.includes(waves[m]),
+                )
+              }
+              loading={busy}
+              onPress={pay}
+            />
+          </SectionCard>
+        </>
+      ) : null}
+      {pending && !active ? (
+        <SectionCard>
+          <SectionHeader title="Have a saved checkout?" />
+          <Text style={typography.body}>
+            If you paid, check this order before starting another payment.
+          </Text>
+          <Button
+            label="Check payment and activate"
+            loading={busy}
+            onPress={recover}
+          />
+          <Button
+            label="Clear unpaid checkout"
+            variant="outline"
+            onPress={() =>
+              Alert.alert(
+                "Clear this checkout?",
+                "Only clear it if you did not pay. Keep your payment receipt if you need support.",
+                [
+                  { text: "Keep order", style: "cancel" },
+                  {
+                    text: "I did not pay",
+                    onPress: async () => {
+                      await AsyncStorage.removeItem(pendingKey);
+                      setPending(null);
+                    },
+                  },
+                ],
+              )
+            }
+          />
+        </SectionCard>
+      ) : null}
+      <Button label="Refresh plan" variant="outline" onPress={load} />
     </Screen>
-  )
+  );
 }
-
+function Choice({ label, selected, onPress }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.choice, selected && styles.selected]}
+    >
+      <Text style={[styles.choiceText, selected && { color: "#fff" }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 const styles = StyleSheet.create({
-  stack: {
-    marginTop: 18,
-    gap: 8,
+  stack: { gap: 13, marginTop: 15 },
+  choices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  choice: {
+    paddingVertical: 11,
+    paddingHorizontal: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
   },
-  line: {
-    fontSize: 14,
-    color: "#4b544e",
+  selected: { backgroundColor: palette.primary, borderColor: palette.primary },
+  choiceText: {
+    fontFamily: "NunitoSans_700Bold",
+    fontSize: 13,
+    color: palette.primary,
   },
   price: {
-    marginTop: 18,
     fontSize: 34,
-    fontWeight: "800",
-    color: "#ba5b33",
+    fontFamily: "NunitoSans_800ExtraBold",
+    color: palette.primary,
+    marginVertical: 14,
   },
-})
+  note: { ...typography.body, fontSize: 12, marginVertical: 14 },
+  error: { ...typography.body, color: "#a34c36" },
+});

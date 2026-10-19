@@ -1,0 +1,15 @@
+{
+  "name": "chefos-supabase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/test-database.mjs",
+    "pricing:sync": "node scripts/sync-pricing.mjs",
+    "check": "deno check functions/chefos-api/index.ts functions/chefos-payments-webhook/index.ts",
+    "test:edge": "deno test --allow-env functions/api_test.ts"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "deno": "^2.5.4"
+  }
+}

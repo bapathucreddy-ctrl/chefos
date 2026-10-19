@@ -1,18 +1,32 @@
 {
   "cli": {
-    "version": ">= 16.18.0"
+    "version": ">= 16.18.0",
+    "appVersionSource": "local"
   },
   "build": {
     "preview": {
+      "node": "22.16.0",
       "distribution": "internal",
+      "environment": "preview",
+      "env": { "APP_VARIANT": "user" },
       "android": {
         "buildType": "apk"
       }
     },
+    "preview-chef": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "chef" }
+    },
     "production": {
+      "node": "22.16.0",
+      "env": { "APP_VARIANT": "user" },
       "android": {
         "buildType": "app-bundle"
       }
+    },
+    "production-chef": {
+      "extends": "production",
+      "env": { "APP_VARIANT": "chef" }
     }
   }
 }
