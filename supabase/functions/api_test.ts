@@ -65,6 +65,36 @@ Deno.test("Auth verification rejects invalid tokens and suspended profiles befor
     globalThis.fetch = original;
   }
 });
+Deno.test("Diet profile routes preserve owner scope and return edit conflicts", async () => {
+  const original = globalThis.fetch;
+  let role = "customer", conflict = false, savedArgs: Record<string, unknown> = {};
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/auth/v1/user")) return response({ id: "customer" });
+      if (url.includes("/chefos_profiles")) return response({ id: "customer", role, is_active: true });
+      if (url.includes("/chefos_diet_profile")) {
+        savedArgs = JSON.parse(String(init?.body));
+        if (conflict) return response({ code: "40001", message: "Profile changed elsewhere" }, 400);
+        return response({ profile: savedArgs.p_profile, revision: 1, ready: true });
+      }
+      return response({ message: "Unexpected request" }, 500);
+    };
+    assert((await handle(request("GET preferences/diet"))).status === 200);
+    assert(savedArgs.p_profile === null);
+    const write = () => new Request("https://example.test/functions/v1/chefos-api", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
+      body: JSON.stringify({ method: "PUT", path: "preferences/diet", data: { profile: { age: 30 }, revision: 0, user_id: "someone-else" } }),
+    });
+    assert((await handle(write())).status === 200);
+    assert(savedArgs.p_expected_revision === 0 && !Object.hasOwn(savedArgs, "user_id"));
+    conflict = true;
+    assert((await handle(write())).status === 409);
+    role = "chef";
+    assert((await handle(write())).status === 403);
+  } finally { globalThis.fetch = original; }
+});
+
 Deno.test("Payment mismatch never reaches capture or activation", async () => {
   const original = globalThis.fetch;
   let captured = false;

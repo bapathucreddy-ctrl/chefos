@@ -1,47 +1,44 @@
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, Switch, Text, View } from "react-native";
 import * as Location from "expo-location";
 
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
 import { readCachedValue, writeCachedValue } from "../api/cache";
-import {
-  AppBadge,
-  Button,
-  Hero,
-  Input,
-  LoadingState,
-  Pill,
-  Screen,
-  SectionCard,
-  SectionHeader,
-  Stat,
-} from "../components/ui";
+import { pendingSegments, uploadPending } from "../api/recordingQueue";
+import { Button, LoadingState, Screen } from "../components/ui";
 import { safeArray, titleCase } from "../utils/format";
-import { palette, typography } from "../theme";
+import { Ionicons } from "@expo/vector-icons";
+import { NAVY, GOLD, PAPER, s } from "../components/reference";
+import { Segments } from "../components/interactive";
+import { ServiceMap } from "../components/ServiceMap";
+import { getChefTrackingState, startChefTracking, stopChefTracking } from "../location/chefTracking";
 
 const CHEF_HOME_CACHE_TTL_MS = 20 * 1000;
 
-export function ChefHomeScreen() {
-  const { logout } = useAuth();
+export function ChefHomeScreen({ navigation }) {
+  const { logout, session: auth } = useAuth();
+  async function safeLogout() {
+    try {
+      if ((await pendingSegments(auth.user.id)).length) {
+        await uploadPending(auth.user.id);
+        if ((await pendingSegments(auth.user.id)).length) throw new Error("Upload your saved kitchen recordings before signing out.");
+      }
+      await logout();
+    } catch (e) { Alert.alert("Saved kitchen recordings", e.message); }
+  }
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState("");
-  const [codes, setCodes] = useState({});
-  async function serviceAction(session, action) {
-    setBusy(session.id);
-    try {
-      await api.post(`chefs/partner/service/${session.id}/${action}/`, {
-        otp: codes[session.id],
-      });
-      setCodes((c) => ({ ...c, [session.id]: "" }));
-      await load(true);
-    } catch (err) {
-      Alert.alert("Service update", err.message);
-    } finally {
-      setBusy("");
-    }
-  }
+  const [workspace, setWorkspace] = useState("visits");
+  const [trackingNote, setTrackingNote] = useState("");
+  const available = Boolean(data?.partner_profile?.chef?.is_available);
+  const loaded = Boolean(data);
+  useEffect(() => {
+    if (!data) return;
+    if (available) startChefTracking(auth.user.id, null, false).then((state) => setTrackingNote(state.mode === "background" ? "Live GPS sharing is on" : "GPS updates while this app is open")).catch(() => setTrackingNote("Enable GPS using Update location"));
+    else getChefTrackingState().then((state) => { if (!state?.sessionId || !data.service_sessions?.some((visit) => visit.id === state.sessionId)) return stopChefTracking(); }).catch(() => {});
+  }, [available, loaded, auth.user.id]);
 
   const load = async (soft = false) => {
     if (!soft) setLoading(true);
@@ -54,9 +51,10 @@ export function ChefHomeScreen() {
         setLoading(false);
       }
 
-      const res = await api.get("chefs/partner/me/");
-      setData(res.data);
-      await writeCachedValue("chefs:partner:me", res.data);
+      const [res, visits] = await Promise.all([api.get("chefs/partner/me/"), api.get("sessions/")]);
+      const merged = { ...res.data, service_sessions: visits.data.rows.filter((r) => r.status !== "completed") };
+      setData(merged);
+      await writeCachedValue("chefs:partner:me", merged);
     } catch (err) {
       Alert.alert(
         "Unable to load chef dashboard",
@@ -78,6 +76,10 @@ export function ChefHomeScreen() {
     setBusy("availability");
     try {
       await api.post("chefs/partner/availability/", { is_available: next });
+      if (next) {
+        try { const state = await startChefTracking(auth.user.id); setTrackingNote(state.mode === "background" ? "Live GPS sharing is on" : "GPS updates while this app is open"); }
+        catch (error) { await api.post("chefs/partner/availability/", { is_available: false }); throw error; }
+      } else await stopChefTracking();
       await load(true);
     } catch (err) {
       Alert.alert(
@@ -105,6 +107,10 @@ export function ChefHomeScreen() {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       });
+      if (available) {
+        const state = await startChefTracking(auth.user.id);
+        setTrackingNote(state.mode === "background" ? "Live GPS sharing is on" : "GPS updates while this app is open");
+      }
       await load(true);
     } catch (err) {
       Alert.alert(
@@ -147,237 +153,41 @@ export function ChefHomeScreen() {
   const activeSessions = safeArray(data?.service_sessions);
 
   return (
-    <Screen>
-      <Hero
-        image="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
-        eyebrow="Chef Partner"
-        title={
-          chef?.name
-            ? `${chef.name}, your partner app is ready.`
-            : "Chef partner app"
-        }
-        subtitle="A dedicated operational app for live requests, availability, and service session management."
-      >
-        <AppBadge label="Partner app" />
-        <Pill
-          label={
-            chef?.is_available
-              ? "Available for bookings"
-              : "Currently unavailable"
-          }
-          tone={chef?.is_available ? "good" : "warm"}
-        />
-        <Pill label={chef?.speciality || "Speciality pending"} tone="neutral" />
-      </Hero>
-
-      <SectionCard>
-        <SectionHeader eyebrow="Status" title="Operational snapshot" />
-        <View style={styles.stats}>
-          <Stat
-            label="Availability"
-            value={chef?.is_available ? "Open" : "Closed"}
-          />
-          <Stat
-            label="Instant requests"
-            value={String(pendingRequests.length)}
-          />
-          <Stat label="Active sessions" value={String(activeSessions.length)} />
-        </View>
-        <View style={styles.actions}>
-          <Button
-            label={
-              busy === "availability"
-                ? "Updating..."
-                : chef?.is_available
-                  ? "Go unavailable"
-                  : "Go available"
-            }
-            onPress={toggleAvailability}
-            loading={busy === "availability"}
-          />
-          <Button
-            label={busy === "location" ? "Syncing..." : "Update my location"}
-            variant="outline"
-            onPress={syncLocation}
-            loading={busy === "location"}
-          />
-        </View>
-      </SectionCard>
-
-      <SectionCard>
-        <SectionHeader
-          eyebrow="Instant flow"
-          title="Pending instant chef requests"
-        />
-        <View style={styles.stack}>
-          {pendingRequests.length ? (
-            pendingRequests.map((request) => (
-              <View key={request.request_id} style={styles.requestCard}>
-                <Text style={styles.requestTitle}>
-                  Request #{request.request_id}
-                </Text>
-                <Text style={styles.requestMeta}>
-                  Customer: {request.username}
-                </Text>
-                <Text style={styles.requestMeta}>
-                  Meal slot: {request.meal} · {request.wave}
-                </Text>
-                <Text style={styles.requestMeta}>
-                  Offer expires in: {request.seconds_left ?? 0}s
-                </Text>
-                <View style={styles.inlineButtons}>
-                  <Button
-                    label="Accept"
-                    onPress={() => respondToOffer(request.request_id, "accept")}
-                    loading={busy === `${request.request_id}:accept`}
-                    style={styles.flexButton}
-                  />
-                  <Button
-                    label="Decline"
-                    variant="outline"
-                    onPress={() =>
-                      respondToOffer(request.request_id, "decline")
-                    }
-                    loading={busy === `${request.request_id}:decline`}
-                    style={styles.flexButton}
-                  />
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text style={typography.body}>
-              No pending instant requests right now.
-            </Text>
-          )}
-        </View>
-      </SectionCard>
-
-      <SectionCard>
-        <SectionHeader eyebrow="Services" title="Active service sessions" />
-        <View style={styles.stack}>
-          {activeSessions.length ? (
-            activeSessions.map((session) => (
-              <View
-                key={session.id || `${session.meal}-${session.status}`}
-                style={styles.requestCard}
-              >
-                <Text style={styles.requestTitle}>
-                  {titleCase(session.meal || session.mode || "session")}
-                </Text>
-                <Text style={styles.requestMeta}>
-                  Status: {titleCase(session.status)}
-                </Text>
-                {session.username ? (
-                  <Text style={styles.requestMeta}>
-                    Customer: {session.username}
-                  </Text>
-                ) : null}
-                {session.status === "assigned" ? (
-                  <>
-                    <Button
-                      label="Start journey"
-                      variant="outline"
-                      loading={busy === session.id}
-                      onPress={() => serviceAction(session, "journey")}
-                    />
-                    <Button
-                      label="Request start code"
-                      loading={busy === session.id}
-                      onPress={() => serviceAction(session, "start-otp")}
-                    />
-                  </>
-                ) : null}
-                {["start_otp", "end_otp"].includes(session.status) ? (
-                  <>
-                    <Input
-                      label="Six digit code from customer"
-                      keyboardType="number-pad"
-                      value={codes[session.id] || ""}
-                      onChangeText={(value) =>
-                        setCodes((c) => ({
-                          ...c,
-                          [session.id]: value.replace(/\D/g, "").slice(0, 6),
-                        }))
-                      }
-                    />
-                    <Button
-                      label={
-                        session.status === "start_otp"
-                          ? "Confirm service start"
-                          : "Confirm service completion"
-                      }
-                      disabled={!/^\d{6}$/.test(codes[session.id] || "")}
-                      loading={busy === session.id}
-                      onPress={() =>
-                        serviceAction(
-                          session,
-                          session.status === "start_otp"
-                            ? "start-verify"
-                            : "end-verify",
-                        )
-                      }
-                    />
-                  </>
-                ) : null}
-                {session.status === "started" ? (
-                  <Button
-                    label="Request completion code"
-                    loading={busy === session.id}
-                    onPress={() => serviceAction(session, "end-otp")}
-                  />
-                ) : null}
-              </View>
-            ))
-          ) : (
-            <Text style={typography.body}>No active sessions right now.</Text>
-          )}
-        </View>
-      </SectionCard>
-
-      <SectionCard>
-        <Button label="Logout" variant="outline" onPress={logout} />
-      </SectionCard>
+    <Screen background={PAPER} contentContainerStyle={{ padding: 20, gap: 20 }}>
+      <View style={s.between}>
+        <View><Text style={s.small}>CHEFOS PARTNER</Text><Text style={s.title}>Hi, {chef?.name?.split(" ")[0] || "chef"}.</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={safeLogout} style={{ padding: 12 }}><Ionicons name="log-out-outline" size={24} color={NAVY} /></Pressable>
+      </View>
+      <Text style={s.small}>{available ? trackingNote || "Your location is shared with nearby customers while online." : "Go online to share your location with nearby customers."}</Text>
+      <View style={[s.card, s.between, { backgroundColor: chef?.is_available ? "#e8f3e9" : "#eeefec", borderWidth: 0 }]}>
+        <View style={{ gap: 5 }}><Text style={s.subtitle}>{chef?.is_available ? "You’re online" : "You’re offline"}</Text><Text style={s.small}>{chef?.is_available ? "Ready for your next kitchen" : "Go online when you’re ready"}</Text></View>
+        <Switch accessibilityLabel="Available for bookings" value={Boolean(chef?.is_available)} disabled={busy === "availability"} onValueChange={toggleAvailability} trackColor={{ false: "#ccd2d5", true: GOLD }} thumbColor={NAVY} />
+      </View>
+      <View style={s.between}><Text style={s.subtitle}>Your neighbourhood</Text><Pressable accessibilityRole="button" accessibilityLabel="Update my location" disabled={busy === "location"} onPress={syncLocation}><Text style={{ color: "#a56d08", fontSize: 12 }}>{busy === "location" ? "Updating…" : "Update location ↗"}</Text></Pressable></View>
+      <ServiceMap points={activeSessions.filter((visit) => visit.latitude != null && visit.longitude != null).map((visit) => ({ id: visit.id, name: visit.building_name || "Assigned home", latitude: visit.latitude, longitude: visit.longitude, kind: "home" }))}
+        height={240} onSelect={(id) => { const visit = activeSessions.find((item) => item.id === id); if (visit) navigation.navigate("ChefCooking", { session: visit }); }} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Manage my time slots" onPress={() => navigation.navigate("ChefSchedule")}
+        style={({ pressed }) => ({ padding: 20, borderRadius: 22, backgroundColor: NAVY, flexDirection: "row", alignItems: "center", gap: 13, opacity: pressed ? 0.85 : 1 })}>
+        <Ionicons name="calendar-outline" size={27} color={GOLD} /><View style={{ flex: 1 }}><Text style={[s.subtitle, { color: "#fff" }]}>Make time for what works.</Text><Text style={[s.small, { color: "#d3dbe5" }]}>Adjust your cooking slots & leave</Text></View><Ionicons name="arrow-forward" size={23} color="#fff" />
+      </Pressable>
+      <Segments label="Partner workspace" value={workspace} onChange={setWorkspace} options={[{ value: "visits", label: `Cooking visits · ${activeSessions.length}`, icon: "restaurant-outline" }, { value: "requests", label: `Requests · ${pendingRequests.length}`, icon: "flash-outline" }]} />
+      {workspace === "requests" ? <>
+        {pendingRequests.map((request) => <View key={request.request_id} style={[s.card, { gap: 14 }]}>
+          <View style={s.between}><Text style={s.subtitle}>A kitchen needs you</Text><Text style={{ color: "#aa710c", fontWeight: "700" }}>{request.seconds_left ?? 0}s</Text></View>
+          <Text style={s.muted}>{request.username} · {request.building_name || "Customer’s home"}</Text>
+          <Text style={s.subtitle}>{(request.meals || [request.meal]).map(titleCase).join(" + ")} · {request.people_count || "—"} people</Text>
+          {request.cuisine ? <Text style={s.small}>{titleCase(request.cuisine)}</Text> : null}
+          <View style={{ flexDirection: "row", gap: 10 }}><Button label="Decline" variant="outline" onPress={() => respondToOffer(request.request_id, "decline")} loading={busy === `${request.request_id}:decline`} style={{ flex: 1 }} /><Button label="Accept request" variant="gold" onPress={() => respondToOffer(request.request_id, "accept")} loading={busy === `${request.request_id}:accept`} style={{ flex: 1 }} /></View>
+        </View>)}
+        {!pendingRequests.length ? <Text style={s.muted}>You’re all caught up. New requests appear here.</Text> : null}
+      </> : <>
+        {activeSessions.map((visit) => <View key={visit.id} style={[s.card, { gap: 15 }]}>
+          <View style={s.row}><View style={{ backgroundColor: "#fff1d2", padding: 13, borderRadius: 16 }}><Ionicons name="restaurant-outline" size={25} color={NAVY} /></View><View style={{ flex: 1, gap: 5 }}><Text style={s.subtitle}>{visit.building_name || "Your next cooking visit"}</Text><Text style={s.small}>{visit.service_date} · {(visit.meals || [visit.meal]).map(titleCase).join(" + ")}</Text></View></View>
+          <Text style={s.muted}>{titleCase(visit.status)}{visit.starts_at ? ` · ${new Date(visit.starts_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}` : ""}</Text>
+          <Button label="Open cooking visit" onPress={() => navigation.navigate("ChefCooking", { session: visit })} />
+        </View>)}
+        {!activeSessions.length ? <Text style={s.muted}>Your next booked kitchen will appear here.</Text> : null}
+      </>}
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  stats: {
-    marginTop: 18,
-    gap: 12,
-  },
-  actions: {
-    marginTop: 16,
-    gap: 12,
-  },
-  stack: {
-    marginTop: 18,
-    gap: 14,
-  },
-  requestCard: {
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: palette.surfaceAlt,
-    borderWidth: 1,
-    borderColor: palette.border,
-    gap: 6,
-  },
-  requestTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    fontFamily: "NunitoSans_700Bold",
-    color: palette.text,
-  },
-  requestMeta: {
-    fontSize: 14,
-    color: palette.muted,
-  },
-  inlineButtons: {
-    marginTop: 10,
-    flexDirection: "row",
-    gap: 10,
-  },
-  flexButton: {
-    flex: 1,
-  },
-});

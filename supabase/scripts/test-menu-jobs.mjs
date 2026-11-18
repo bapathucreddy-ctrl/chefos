@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import { syntheticMenu } from './menu-fixtures.mjs';
+export async function testMenuJobs(db,actor,rpc,{customer,other,partner,sub,booking,day,diet}){
+ const current=await actor(customer,()=>rpc('chefos_menu_request',["'current'"]));
+ assert.equal(current.menu.id,booking.menu_id,'paid future-start plans expose the upcoming first menu');
+ const args={menu_id:booking.menu_id,version:1,date:day,meal:'breakfast',request:'A different rice dish'};
+ const first=await actor(customer,()=>rpc('chefos_menu_request',["'swap'",'$1'],[args]));
+ const second=await actor(customer,()=>rpc('chefos_menu_request',["'swap'",'$1'],[{...args,meal:'lunch'}]));
+ await actor(other,()=>assert.rejects(()=>rpc('chefos_menu_request',["'job'",'$1'],[{job_id:first.job_id}]),/not found/i));
+ await actor(customer,()=>assert.rejects(()=>rpc('chefos_server_claim_menu',['$1'],[first.job_id]),/permission denied/i));
+ await actor(partner,()=>assert.rejects(()=>rpc('chefos_menu_request',["'current'"]),/Customer account/i));
+ const one=await rpc('chefos_server_claim_menu',['$1'],[first.job_id]);
+ assert.equal(await rpc('chefos_server_claim_menu',['$1'],[first.job_id]),null,'a second worker cannot claim an unexpired lease');
+ const two=await rpc('chefos_server_claim_menu',['$1'],[second.job_id]);
+ await assert.rejects(()=>rpc('chefos_server_finish_menu',['$1','$2','$3',"'custom'"],[one.id,'00000000-0000-0000-0000-000000000099',syntheticMenu(one.input)]),/lease/i);
+ await rpc('chefos_server_finish_menu',['$1','$2','$3',"'custom'"],[one.id,one.claim_token,syntheticMenu(one.input,'Replaced')]);
+ const stale=await rpc('chefos_server_finish_menu',['$1','$2','$3',"'custom'"],[two.id,two.claim_token,syntheticMenu(two.input,'Stale')]);assert.equal(stale.saved,false);
+ const changed=await actor(customer,()=>rpc('chefos_menu_request',["'current'"]));
+ assert.equal(changed.menu.version,2);assert.equal(changed.menu.document.days[0].meals.breakfast.title,'Replaced breakfast 1');
+ assert.equal(changed.menu.document.days[0].meals.lunch.title,current.menu.document.days[0].meals.lunch.title);
+ await actor(customer,()=>assert.rejects(()=>rpc('chefos_menu_request',["'accept'",'$1'],[{menu_id:booking.menu_id,version:1}]),/changed/i));
+ await actor(customer,()=>rpc('chefos_menu_request',["'accept'",'$1'],[{menu_id:booking.menu_id,version:2}]));
+ await actor(customer,()=>rpc('chefos_diet_profile',['$1','1'],[{...diet,allergens:['milk']}]));
+ assert.equal((await actor(customer,()=>rpc('chefos_menu_request',["'current'"]))).menu.stale,true);
+ await rpc('chefos_server_enqueue_weeks');await rpc('chefos_server_enqueue_weeks');
+ const jobs=(await db.query("select * from chefos_private.menu_jobs where subscription_id=$1 and kind='weekly' and profile_revision=2",[sub.id])).rows;
+ assert.equal(jobs.length,1,'weekly job enqueue is idempotent');
+ const replan=await rpc('chefos_server_claim_menu',['$1'],[jobs[0].id]);
+ assert.deepEqual(replan.input.profile.allergens,['milk']);
+ await rpc('chefos_server_finish_menu',['$1','$2','$3',"'custom'"],[replan.id,replan.claim_token,syntheticMenu(replan.input,'New week')]);
+ const refreshed=await actor(customer,()=>rpc('chefos_menu_request',["'current'"]));
+ assert.equal(refreshed.menu.stale,false);assert.equal(refreshed.menu.needs_chef_review,true);assert.equal(refreshed.menu.accepted,true);
+ assert.equal((await db.query('select count(*)::int n from chefos_private.menu_revisions where menu_id=$1',[booking.menu_id])).rows[0].n,3);
+ console.log('PASS: private menu jobs; exclusive worker leases; stale result/version rejection; per-meal replacement; full revision history; preference-change invalidation; idempotent automatic weekly jobs');
+}

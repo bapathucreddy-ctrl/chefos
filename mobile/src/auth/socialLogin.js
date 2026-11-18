@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { requireSupabase } from "../api/supabase";
+import { requireSupabase, authScheme } from "../api/supabase";
 WebBrowser.maybeCompleteAuthSession();
 
 export async function socialLogin(provider) {
@@ -8,7 +8,7 @@ export async function socialLogin(provider) {
   const redirect =
     Platform.OS === "web"
       ? `${window.location.origin}/auth/confirm`
-      : "chefos-user://auth/confirm";
+      : `${authScheme}://auth/confirm`;
   const { data, error } = await client.auth.signInWithOAuth({
     provider,
     options: { redirectTo: redirect, skipBrowserRedirect: true },

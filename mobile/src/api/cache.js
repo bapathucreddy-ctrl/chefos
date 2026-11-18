@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { environment } from "./supabase";
 
-const CACHE_PREFIX = "chefos:supabase:api:";
+const CACHE_PREFIX = `chefos:supabase:api:${environment}:`;
 let owner = null;
 const owners = new WeakMap();
 export function setCacheOwner(value) {

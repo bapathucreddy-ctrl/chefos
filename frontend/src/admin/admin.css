@@ -12,6 +12,23 @@
 .ops-login h2 {
   font-weight: 800;
 }
+.ops-map-heading { display:flex; justify-content:space-between; gap:20px; align-items:center; margin-bottom:22px; }
+.ops-community-grid { display:grid; grid-template-columns:minmax(0,2fr) minmax(240px,1fr); gap:22px; }
+.ops-community-map { overflow:hidden; border-radius:24px; position:relative; isolation:isolate; }
+.ops-map-hint { position:absolute; z-index:500; bottom:30px; left:16px; right:16px; padding:14px; background:white; border-radius:16px; box-shadow:0 4px 20px #14213d22; font-size:13px; }
+.ops-building-pin { display:grid; place-items:center; background:#14213d; border:3px solid white; color:white; border-radius:50% 50% 50% 10px; box-shadow:0 4px 14px #14213d40; font-size:25px; }
+.ops-building-pin.draft { background:#f2b134; color:#14213d; }
+.ops-building-list { display:flex; flex-direction:column; gap:12px; }
+.ops-building-card { display:flex; align-items:center; text-align:left; gap:14px; padding:20px; border:1px solid #e4e7eb; border-radius:20px; color:#14213d; background:white; }
+.ops-building-card.selected { background:#fff8e8; border-color:#f2b134; }
+.ops-building-card>span:nth-child(2) { flex:1; }
+.ops-building-card small { display:block; margin-top:6px; color:#7b8597; }
+.ops-building-symbol { display:grid; place-items:center; width:44px; height:44px; border-radius:15px; background:#f4f1e9; font-size:25px; }
+.ops-map-selection { font-size:13px; color:#7b8597; }
+.ops-map-controls { display:flex; gap:10px; flex-wrap:wrap; }
+.ops-live-pin { background:#14213d; color:white; border:3px solid white; border-radius:50%; display:grid; place-items:center; font-weight:800; box-shadow:0 4px 16px #14213d40; transition:transform 900ms linear; }
+.ops-live-list { max-height:520px; overflow:auto; }
+@media(max-width:900px) { .ops-community-grid { grid-template-columns:1fr; } .ops-map-heading { align-items:flex-start; flex-direction:column; } }
 .ops-app button,
 .ops-login button {
   font: inherit;
@@ -1278,3 +1295,10 @@
     transition: none;
   }
 }
+.ops-community-panel { background: #fff; border: 1px solid #e9e5de; border-radius: 16px; padding: 24px; }
+.ops-community-panel h2 { margin: 0 0 12px; }
+.ops-community-panel p { color: #667084; margin-bottom: 24px; }
+.ops-community-form { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 18px; }
+.ops-community-form label { display: flex; flex-direction: column; gap: 9px; font-size: 13px; }
+.ops-community-form input { border: 1px solid #d9dce2; padding: 13px; border-radius: 9px; background: #faf9f6; color: #14213d; }
+.ops-community-form button { align-self: end; }

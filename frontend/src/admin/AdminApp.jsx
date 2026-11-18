@@ -7,16 +7,25 @@ import {
   supabase,
   supabaseConfigured,
   supabaseUrl,
+  isTestEnvironment,
 } from "../lib/supabase";
 import "./admin.css";
+import Communities from "./Communities";
+import ChefSafety from "./ChefSafety";
+import Disputes from "./Disputes";
+import LiveLocations from "./LiveLocations";
 
 const sections = [
   ["overview", "Overview", "home"],
+  ["live-map", "Live chef map", "chef"],
   ["customers", "Customers", "user"],
   ["chefs", "Chef partners", "chef"],
   ["subscriptions", "Subscriptions", "calendar"],
   ["payments", "Payments", "bag"],
   ["pricing", "Pricing definition", "spark"],
+  ["communities", "Communities", "home"],
+  ["chef-safety", "Chef skills & identity", "shield"],
+  ["disputes", "Cooking complaints", "message"],
   ["activity", "Activity log", "clock"],
 ];
 const money = (value, paise = false) =>
@@ -379,7 +388,7 @@ function AdminWorkspace({ section, account, onLogout }) {
           <Brand />
         </Link>
         <span className="ops-workspace-tag">
-          <span /> ADMIN WORKSPACE
+          <span /> {isTestEnvironment ? "TEST WORKSPACE" : "ADMIN WORKSPACE"}
         </span>
         <div className="ops-sidebar-line" />
         <span className="ops-nav-caption">MANAGE YOUR KITCHEN</span>
@@ -485,8 +494,16 @@ function AdminWorkspace({ section, account, onLogout }) {
             </div>
           ) : section === "overview" ? (
             <Overview data={data} />
+          ) : section === "live-map" ? (
+            <LiveLocations data={data} />
           ) : section === "pricing" ? (
             <Pricing data={data} />
+          ) : section === "communities" ? (
+            <Communities data={data} onSaved={() => setRevision((n) => n + 1)} />
+          ) : section === "chef-safety" ? (
+            <ChefSafety data={data} onSaved={() => setRevision((n) => n + 1)} />
+          ) : section === "disputes" ? (
+            <Disputes data={data} onSaved={() => setRevision((n) => n + 1)} />
           ) : (
             <>
               <div className="ops-list-toolbar">

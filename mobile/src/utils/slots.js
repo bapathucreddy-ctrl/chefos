@@ -18,3 +18,8 @@ const labels = {
   D5: "12:00–1:00 AM",
 };
 export const slotLabel = (wave) => labels[wave] || wave;
+export function clockLabel(minutes) {
+  const hour = Math.floor(minutes / 60) % 24;
+  return `${hour % 12 || 12}:${String(minutes % 60).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
+}
+export const visitLabel = (visit) => `${clockLabel(visit.start_minute)} – ${clockLabel(visit.start_minute + visit.meals.length * 60)}`;

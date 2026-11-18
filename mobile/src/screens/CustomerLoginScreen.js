@@ -6,7 +6,7 @@ import { socialLogin } from "../auth/socialLogin";
 import { NativeBrand } from "../components/BrandSplash";
 import { Button, Input, Screen } from "../components/ui";
 import { IndiaFlag, NAVY, GOLD, PAPER, s } from "../components/reference";
-import { requireSupabase } from "../api/supabase";
+import { requireSupabase, environment, isTestEnvironment } from "../api/supabase";
 export function CustomerLoginScreen({ navigation, onBackToOnboarding }) {
   const [mode, setMode] = useState("phone"),
     [identifier, setIdentifier] = useState(""),
@@ -33,6 +33,7 @@ export function CustomerLoginScreen({ navigation, onBackToOnboarding }) {
       : { email: identifier.trim() };
   async function checkAccount(client, user) {
     if (!user) return;
+    if (isTestEnvironment) { const { error } = await client.rpc("chefos_ensure_profile"); if (error) throw error; }
     const { data, error } = await client
       .from("chefos_profiles")
       .select("role,is_active")
@@ -64,7 +65,7 @@ export function CustomerLoginScreen({ navigation, onBackToOnboarding }) {
             ...address,
             options: {
               shouldCreateUser: true,
-              data: { account_type: "customer" },
+              data: { account_type: "customer", chefos_environment: environment },
             },
           });
       if (error) throw error;

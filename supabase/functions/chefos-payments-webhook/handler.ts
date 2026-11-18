@@ -1,13 +1,14 @@
-import { createClient } from "npm:@supabase/supabase-js@2.118.0";
+import { environmentClient } from "../_shared/environment.ts";
+import type { Environment } from "../_shared/environment.ts";
 import { equalHex, hmac, secret } from "../_shared/http.ts";
 
-export async function handle(req: Request): Promise<Response> {
+export async function handle(req: Request, environment: Environment = "production"): Promise<Response> {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
   try {
     const body = await req.text();
     if (body.length > 65536) return new Response("Too large", { status: 413 });
     const signature = req.headers.get("x-razorpay-signature") || "";
-    if (!equalHex(signature, await hmac(secret("RAZORPAY_WEBHOOK_SECRET"), body))) {
+    if (!equalHex(signature, await hmac(secret(environment === "test" ? "RAZORPAY_TEST_WEBHOOK_SECRET" : "RAZORPAY_WEBHOOK_SECRET"), body))) {
       return new Response("Invalid signature", { status: 401 });
     }
     const event = JSON.parse(body);
@@ -16,9 +17,9 @@ export async function handle(req: Request): Promise<Response> {
     if (!payment || payment.status !== "captured") {
       return new Response("Invalid payment", { status: 400 });
     }
-    const client = createClient(secret("SUPABASE_URL"), secret("SUPABASE_SERVICE_ROLE_KEY"), {
+    const client = environmentClient(secret("SUPABASE_URL"), secret("SUPABASE_SERVICE_ROLE_KEY"), {
       auth: { persistSession: false, autoRefreshToken: false },
-    });
+    }, environment);
     const { error } = await client.rpc("chefos_server_capture", {
       p_order: payment.order_id,
       p_payment: payment.id,

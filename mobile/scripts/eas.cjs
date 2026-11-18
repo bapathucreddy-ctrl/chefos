@@ -4,12 +4,16 @@ const [variant = "user", platform = "android", profile = "preview"] =
 if (
   !["user", "chef"].includes(variant) ||
   !["android", "ios"].includes(platform) ||
-  !["preview", "production"].includes(profile)
+  !["preview", "production", "test"].includes(profile)
 )
   throw new Error("Invalid build target");
 const child = spawn(
   process.platform === "win32" ? "npx.cmd" : "npx",
-  ["eas-cli", "build", "--platform", platform, "--profile", variant === "chef" ? `${profile}-chef` : profile],
+  ["eas-cli", "build", "--platform", platform, "--profile", {
+    preview: { user: "preview", chef: "preview-chef" },
+    production: { user: "production", chef: "production-chef" },
+    test: { user: "preview-test", chef: "preview-chef-test" },
+  }[profile][variant]],
   {
     stdio: "inherit",
     shell: process.platform === "win32",

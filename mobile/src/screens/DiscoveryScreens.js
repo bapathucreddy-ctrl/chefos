@@ -14,6 +14,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { api } from "../api/client";
+import { ServiceMap } from "../components/ServiceMap";
+import { Segments } from "../components/interactive";
+import { useLiveLocations } from "../location/useLiveLocations";
+import { isTestEnvironment } from "../api/supabase";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Screen } from "../components/ui";
 import {
@@ -67,6 +71,16 @@ function Search({ value, onChange, onSubmit }) {
 }
 export function HomeScreen({ navigation }) {
   const [search, setSearch] = useState("");
+  const { profile } = useAuth();
+  const [nextVisit, setNextVisit] = useState(null);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    api.get("sessions/").then(({ data }) => {
+      const today = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+      if (active) setNextVisit(data.rows?.find((visit) => visit.service_date === today && visit.status !== "completed") || null);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []));
   return (
     <Screen background={PAPER} contentContainerStyle={{ padding: 18, gap: 17 }}>
       <Header
@@ -80,6 +94,9 @@ export function HomeScreen({ navigation }) {
           </Pressable>
         }
       />
+      <Pressable accessibilityRole="button" accessibilityLabel="Choose your home" onPress={() => navigation.navigate("Household")}
+        style={[s.row, { gap: 8 }]}><Ionicons name="location" size={18} color={GOLD} /><Text style={s.small}>Cooking at your home</Text><Ionicons name="chevron-down" size={15} color={NAVY} /></Pressable>
+      <Text style={[s.title, { fontSize: 29 }]}>What’s cooking{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}?</Text>
       <Search
         value={search}
         onChange={(value) => {
@@ -87,6 +104,19 @@ export function HomeScreen({ navigation }) {
         }}
         onSubmit={() => navigation.navigate("Discover", { search })}
       />
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        {[{ title: "Chef now", subtitle: "Choose • request • cook", icon: "flash", route: "Instant", color: GOLD },
+          { title: "Meal plans", subtitle: "Your week, taken care of", icon: "calendar", route: "Discover", color: "#e9efdf" }].map((item) => <Pressable
+          key={item.route} accessibilityRole="button" accessibilityLabel={item.title} onPress={() => navigation.navigate(item.route)}
+          style={({ pressed }) => ({ flex: 1, backgroundColor: item.color, borderRadius: 23, padding: 19, gap: 10, transform: [{ scale: pressed ? 0.97 : 1 }] })}>
+          <View style={s.between}><Ionicons name={item.icon} color={NAVY} size={26} /><Ionicons name="arrow-forward" size={20} color={NAVY} /></View>
+          <Text style={s.subtitle}>{item.title}</Text><Text style={[s.small, { fontSize: 10 }]}>{item.subtitle}</Text>
+        </Pressable>)}
+      </View>
+      {nextVisit ? <Pressable accessibilityRole="button" accessibilityLabel="Track today's cooking visit" onPress={() => navigation.navigate("Session", { session: nextVisit })}
+        style={{ backgroundColor: NAVY, padding: 18, borderRadius: 22, flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <Ionicons name="restaurant" size={26} color={GOLD} /><View style={{ flex: 1 }}><Text style={[s.subtitle, { color: "#fff" }]}>Your cooking visit</Text><Text style={[s.small, { color: "#cbd4de" }]}>{nextVisit.chef_name} · {nextVisit.status.replaceAll("_", " ")}</Text></View><Ionicons name="arrow-forward" size={22} color="#fff" />
+      </Pressable> : null}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         {cuisines.map((name, index) => (
           <Pressable
@@ -195,7 +225,11 @@ export function ChefListScreen({ navigation, route }) {
     [search, setSearch] = useState(route.params?.search || ""),
     [sort, setSort] = useState(false),
     [cuisine, setCuisine] = useState("All"),
-    [coords, setCoords] = useState(null);
+    [coords, setCoords] = useState(null),
+    [view, setView] = useState("map"),
+    [selectedId, setSelectedId] = useState(null);
+  const { data: liveMap, error: mapError } = useLiveLocations(null, coords);
+  const mapData = liveMap || { chefs: [] };
   useEffect(
     () => setSearch(route.params?.search || ""),
     [route.params?.search],
@@ -237,11 +271,11 @@ export function ChefListScreen({ navigation, route }) {
   const filtered = chefs
     .filter(
       (c) =>
-        (c.name + " " + c.speciality)
+        (c.name + " " + (c.speciality || ""))
           .toLowerCase()
           .includes(search.toLowerCase()) &&
         (cuisine === "All" ||
-          c.speciality.toLowerCase().includes(cuisine.toLowerCase())),
+          (c.speciality || "").toLowerCase().includes(cuisine.toLowerCase())),
     )
     .sort((a, b) =>
       sort ? Number(b.rating) - Number(a.rating) : a.name.localeCompare(b.name),
@@ -253,6 +287,7 @@ export function ChefListScreen({ navigation, route }) {
         onBack={() => navigation.navigate("Home")}
       />
       <Search value={search} onChange={setSearch} />
+      <Segments label="Discovery view" value={view} onChange={setView} options={[{ value: "map", label: "Map", icon: "map-outline" }, { value: "list", label: "List", icon: "list-outline" }]} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -277,6 +312,15 @@ export function ChefListScreen({ navigation, route }) {
           onPress={() => setSort(!sort)}
         />
       </ScrollView>
+      {view === "map" ? <>
+        <ServiceMap points={(mapData.chefs || []).filter((point) => filtered.some((chef) => chef.id === point.id))}
+          center={coords} selectedId={selectedId} onSelect={setSelectedId} height={310} />
+        <Text style={s.small}>{mapError || (isTestEnvironment ? "Test chef locations · Simulated movement is controlled from the test admin map" : "Live chef locations · Tap a pin to choose your chef")}</Text>
+        {selectedId && filtered.some((chef) => chef.id === selectedId) ? (() => {
+          const selected = filtered.find((chef) => chef.id === selectedId);
+          return <View style={[s.card, { borderColor: GOLD, gap: 14 }]}><View style={s.row}><ChefAvatar chef={selected} size={62} /><View style={{ flex: 1 }}><Text style={s.subtitle}>{selected.name}</Text><Text style={s.small}>★ {Number(selected.rating).toFixed(1)} · {selected.speciality}</Text></View></View><Button label={`View ${selected.name}`} onPress={() => navigation.navigate("ChefProfile", { chef: selected })} /></View>;
+        })() : null}
+      </> : null}
       <Text style={s.small}>
         {loading
           ? "Finding your kitchen companion…"
@@ -299,7 +343,7 @@ export function ChefListScreen({ navigation, route }) {
           accessibilityRole="button"
           accessibilityLabel={`View ${chef.name}`}
           key={chef.id}
-          onPress={() => navigation.navigate("ChefProfile", { chef })}
+          onPress={() => view === "map" ? setSelectedId(chef.id) : navigation.navigate("ChefProfile", { chef })}
           style={[
             s.row,
             {
@@ -433,7 +477,7 @@ export function ChefProfileScreen({ navigation, route }) {
         </Notice>
         <Button
           label="Book Chef"
-          onPress={() => navigation.navigate("Booking", { chef })}
+          onPress={() => navigation.navigate("FoodProfile", { chef })}
         />
       </View>
     </Screen>
@@ -449,6 +493,8 @@ export function ProfileScreen({ navigation }) {
         {profile?.email || profile?.phone || "Welcome to Chefos"}
       </Text>
       {[
+        ["Food & health preferences", "FoodProfile"],
+        ["My community & flat", "Household"],
         ["Weekly menu", "Menu"],
         ["Today’s meals & service codes", "Today"],
         ["Your subscriptions", "Subscription"],

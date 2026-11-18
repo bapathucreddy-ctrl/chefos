@@ -1,4 +1,5 @@
 import "react-native-gesture-handler";
+import "./src/location/chefTracking";
 
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
@@ -10,6 +11,8 @@ import { AuthProvider } from "./src/auth/AuthContext";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { palette } from "./src/theme";
 import ReferenceSplash from "./src/components/ReferenceSplash";
+import { isTestEnvironment } from "./src/api/supabase";
+import { Text } from "react-native";
 
 const navTheme = {
   ...DefaultTheme,
@@ -38,6 +41,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
+        {isTestEnvironment ? <Text style={{ padding: 7, textAlign: "center", backgroundColor: "#F2B134", color: "#14213D", fontSize: 11 }}>CHEFOS TEST ENVIRONMENT</Text> : null}
         <AuthProvider>
           <NavigationContainer theme={navTheme}>
             <StatusBar style="dark" />

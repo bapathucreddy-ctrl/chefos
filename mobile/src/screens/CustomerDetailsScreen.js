@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
-import { requireSupabase } from "../api/supabase";
+import { requireSupabase, isTestEnvironment } from "../api/supabase";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Input, Screen } from "../components/ui";
 import { Header, PAPER, s } from "../components/reference";
 export function CustomerDetailsScreen() {
-  const { session, logout } = useAuth();
+  const { session, logout, refreshProfile } = useAuth();
   const [name, setName] = useState(session.user.user_metadata?.full_name || ""),
     [contactEmail, setContactEmail] = useState(session.user.email || ""),
     [city, setCity] = useState(""),
@@ -23,6 +23,7 @@ export function CustomerDetailsScreen() {
         .then(({ error }) => {
           if (error) throw error;
         });
+      if (isTestEnvironment) { await refreshProfile(); return; }
       const { error } = await requireSupabase().auth.updateUser({
         data: {
           full_name: name.trim(),

@@ -12,11 +12,20 @@ env/
 
 dist/
 dist-chef/
+dist-interactive/
+dist-previews/
+dist-demo/
+dist-test/
+dist-test-user/
 dist-reference/
 supabase/.temp/
 supabase/backups/
 supabase/imports/
 build/
+previews/
+chefos-screen-previews.zip
+*.apk
+*.aab
 .expo/
 .expo-shared/
 

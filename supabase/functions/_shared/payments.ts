@@ -1,10 +1,13 @@
 import { HttpError, secret } from "./http.ts";
-export async function razorpay(path: string, body?: Record<string, unknown>) {
+export async function razorpay(path: string, body?: Record<string, unknown>, environment: "production" | "test" = "production") {
+  const prefix = environment === "test" ? "RAZORPAY_TEST_" : "RAZORPAY_";
+  const key = secret(prefix + "KEY_ID");
+  if (environment === "test" && !key.startsWith("rzp_test_")) throw new HttpError(503, "Configure Razorpay test-mode keys for Chefos test.");
   const response = await fetch("https://api.razorpay.com/v1/" + path, {
     method: body ? "POST" : "GET",
     headers: {
       Authorization: "Basic " +
-        btoa(secret("RAZORPAY_KEY_ID") + ":" + secret("RAZORPAY_KEY_SECRET")),
+        btoa(key + ":" + secret(prefix + "KEY_SECRET")),
       "Content-Type": "application/json",
     },
     ...(body ? { body: JSON.stringify(body) } : {}),

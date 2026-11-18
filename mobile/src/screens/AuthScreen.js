@@ -15,7 +15,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Button, Input, Screen } from "../components/ui";
 import { NativeBrand } from "../components/BrandSplash";
 import { palette, typography } from "../theme";
-import { requireSupabase } from "../api/supabase";
+import { requireSupabase, authScheme } from "../api/supabase";
 
 export function AuthScreen({ navigation, route }) {
   const role = route.params?.role === "chef" ? "chef" : "user";
@@ -35,7 +35,7 @@ export function AuthScreen({ navigation, route }) {
       const { error } = await requireSupabase().auth.resetPasswordForEmail(
         username.trim(),
         {
-          redirectTo: `${role === "chef" ? "chefos-chef" : "chefos-user"}://reset-password`,
+          redirectTo: `${authScheme}://reset-password`,
         },
       );
       if (error) throw error;

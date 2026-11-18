@@ -5,8 +5,8 @@
   "scripts": {
     "test": "node scripts/test-database.mjs",
     "pricing:sync": "node scripts/sync-pricing.mjs",
-    "check": "deno check functions/chefos-api/index.ts functions/chefos-payments-webhook/index.ts",
-    "test:edge": "deno test --allow-env functions/api_test.ts"
+    "check": "deno check functions/chefos-api/index.ts functions/chefos-payments-webhook/index.ts functions/chefos-menu-worker/index.ts functions/chefos-face-webhook/index.ts functions/chefos-recordings/index.ts functions/_shared/scheduling.ts",
+    "test:edge": "deno test --allow-env functions/api_test.ts functions/scheduling_test.ts functions/menu_test.ts functions/safety_test.ts functions/selfie_test.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",

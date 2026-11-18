@@ -1,6 +1,10 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFile,readdir,writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { testVisits } from './test-visits.mjs';
+import { testSessionSafety } from './test-session-safety.mjs';
+import { testInstantVisits } from './test-instant-visits.mjs';
+import { testTestEnvironment } from './test-test-environment.mjs';
 process.on('uncaughtException',error=>{console.error(error.message,error.where || '',error.internalQuery || '');process.exit(1)});
 const db=new PGlite();
 await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
@@ -21,6 +25,30 @@ await db.query(`update chefos_profiles set role='admin' where id=$1`,[admin]);
 const chef=(await db.query(`update chefos_chefs set is_verified=true,is_available=true where user_id=$1 returning id`,[chefUser])).rows[0].id;
 async function actor(id,fn){await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${id}',false)`);try{return await fn()}finally{await db.exec('reset role')}}
 const rpc=async(name,args=[],values=[])=> (await db.query(`select ${name}(${args.join(',')}) as result`,values)).rows[0].result;
+const diet={age:30,height_cm:175,weight_kg:70,activity_level:'moderate',goal:'healthy_eating',diet:'vegetarian',cuisines:['south_indian'],allergens:[],other_restrictions:'',dislikes:'',non_veg_days:[],cheat_meal_day:null,allergies_confirmed:true,personalisation_consent:true};
+await actor(customer,async()=>{
+ assert.equal((await rpc('chefos_diet_profile')).ready,false);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,personalisation_consent:false}]),/consent/i);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,weight_kg:0}]),/weight/i);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,age:null}]),/age/i);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,user_id:other}]),/Unsupported/i);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,allergens:['unknown']}]),/allergen/i);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,cuisines:['south_indian','south_indian']}]),/Duplicate/i);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[{...diet,non_veg_days:[1]}]),/Vegetarian/i);
+ const saved=await rpc('chefos_diet_profile',['$1','0'],[diet]);
+ assert.equal(Number(saved.bmi),22.9);assert.equal(saved.revision,1);assert.equal(saved.review_required,false);
+ await assert.rejects(()=>rpc('chefos_diet_profile',['$1','0'],[diet]),/changed elsewhere/i);
+ const next=await rpc('chefos_diet_profile',['$1','1'],[{...diet,allergens:['milk']}]);
+ assert.equal(next.review_required,true);assert.equal(next.revision,2);
+ await assert.rejects(()=>db.query('select * from chefos_private.diet_profiles'),/permission denied/i);
+});
+await assert.rejects(()=>rpc('chefos_server_prepare_order',['$1','$2'],[other,{schedule_version:2}]),/Complete your food/i);
+await actor(other,async()=>{
+ assert.equal((await rpc('chefos_diet_profile')).ready,false);
+ await rpc('chefos_diet_profile',['$1','0'],[diet]);
+});
+await actor(chefUser,()=>assert.rejects(()=>rpc('chefos_diet_profile'),/Customer account required/i));
+await actor(admin,()=>assert.rejects(()=>rpc('chefos_diet_profile'),/Customer account required/i));
 await actor(customer,async()=>{
  await rpc('chefos_complete_profile',["'Customer Name'","'Bengaluru'"]);
  await assert.rejects(()=>rpc('chefos_complete_profile',["''","'Bengaluru'"]),/name and city/i);
@@ -50,29 +78,42 @@ for(const band of catalog.households){
 }
 assert.equal(referenceChecks,44);
 await db.query('insert into chefos_private.chef_locations(chef_id,latitude,longitude) values($1,12.97,77.59)',[chef]);
+await actor(customer,async()=>{
+ const map=await rpc('chefos_discovery_map',['12.97','77.59','5']);
+ assert.equal(map.chefs.length,1);assert.equal(map.chefs[0].id,chef);
+ assert.equal(map.chefs[0].latitude,12.97);
+ assert.equal(JSON.stringify(map).includes('otp_code'),false);
+ assert.equal((await rpc('chefos_discovery_map',['0','0','5'])).chefs.length,0);
+ await assert.rejects(()=>rpc('chefos_discovery_map',['91','77','5']),/valid map location/i);
+ await assert.rejects(()=>rpc('chefos_discovery_map',['12','null','5']),/valid map location/i);
+});
+await db.exec('set role anon');
+await assert.rejects(()=>rpc('chefos_discovery_map'),/permission denied/i);
+await db.exec('reset role');
 await actor(other,()=>rpc('chefos_mobile_action',["'preference.save'",`'{"people_count":8}'`]));
-const instant=await actor(other,()=>rpc('chefos_mobile_action',["'instant.create'",`'{"latitude":12.97,"longitude":77.59,"meal":"lunch","wave":"L1"}'`]));
+// Historical October fixtures are inserted only as the database owner. Public
+// callers must upgrade; these fixtures test captured-order recovery/isolation.
+async function historical(id,fn){await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);try{return await fn()}finally{await db.query("select set_config('request.jwt.claim.sub','',false)")}}
+await actor(other,()=>assert.rejects(()=>rpc('chefos_mobile_action',["'instant.create'",`'{"latitude":12.97,"longitude":77.59,"meal":"lunch","wave":"L1"}'`]),/Upgrade/i));
+const instant=await historical(other,()=>rpc('chefos_private.chefos_mobile_legacy',["'instant.create'",`'{"latitude":12.97,"longitude":77.59,"meal":"lunch","wave":"L1"}'`]));
 await actor(chefUser,async()=>{
  assert.equal((await rpc('chefos_mobile_action',["'partner.me'"])).pending_instant_offers.length,1);
- await rpc('chefos_mobile_action',["'instant.respond'",'$1'],[{request_id:instant.id,action:'accept'}]);
- await assert.rejects(()=>rpc('chefos_mobile_action',["'instant.respond'",'$1'],[{request_id:instant.id,action:'accept'}]),/no longer/i);
 });
+await historical(chefUser,()=>rpc('chefos_private.chefos_mobile_legacy',["'instant.respond'",'$1'],[{request_id:instant.id,action:'accept'}]));
+await actor(chefUser,()=>assert.rejects(()=>rpc('chefos_mobile_action',["'instant.respond'",'$1'],[{request_id:instant.id,action:'accept'}]),/Upgrade/i));
 assert.equal((await db.query('select quote from chefos_private.instant_details where request_id=$1',[instant.id])).rows[0].quote.people_count,8);
 const service=(await db.query('select id from chefos_private.service_sessions where instant_request_id=$1',[instant.id])).rows[0].id;
 await actor(chefUser,async()=>{
- await rpc('chefos_service_action',['$1',"'start.request'"],[service]);
- const result=await rpc('chefos_service_action',['$1',"'start.verify'","'wrong'"],[service]);assert.equal(result.error,true);
+ await assert.rejects(()=>rpc('chefos_service_action',['$1',"'start.request'"],[service]),/legacy service.*verified visit/i);
  assert(!JSON.stringify(await rpc('chefos_mobile_action',["'partner.me'"])).includes('otp_code'));
 });
-assert.equal((await db.query('select otp_attempts from chefos_private.service_sessions where id=$1',[service])).rows[0].otp_attempts,1);
-const code=(await db.query('select otp_code from chefos_private.service_sessions where id=$1',[service])).rows[0].otp_code;
-await actor(other,async()=>{assert.equal((await rpc('chefos_mobile_action',["'service.my'"])).service_otps[0].start_otp,code)});
+assert.equal((await db.query('select otp_attempts from chefos_private.service_sessions where id=$1',[service])).rows[0].otp_attempts,0);
 await actor(customer,async()=>{assert.equal((await rpc('chefos_mobile_action',["'service.my'"])).service_otps.length,0)});
-await actor(chefUser,()=>rpc('chefos_service_action',['$1',"'start.verify'",'$2'],[service,code]));
 await actor(customer,async()=>{await assert.rejects(()=>rpc('chefos_save_menu',["'{}'"]),/seven dishes/i)});
 await actor(admin,async()=>{assert.equal((await rpc('chefos_ops_data',["'overview'"])).customers,2)});
 const booking={chef,meal_type:['lunch'],people_count:3,plan_cycle:'monthly',meal_wave:{lunch:'L2'},start_date:(await db.query("select (now() at time zone 'Asia/Kolkata')::date::text as day")).rows[0].day};
-const prepared=await rpc('chefos_server_prepare_order',['$1','$2'],[customer,booking]);
+await assert.rejects(()=>rpc('chefos_server_prepare_order',['$1','$2'],[customer,booking]),/Upgrade/i);
+const prepared=await rpc('chefos_private.chefos_prepare_subscription',['$1','$2'],[customer,booking]);
 await rpc('chefos_server_record_order',['$1','$2','$3'],[customer,'order_test',prepared]);
 await actor(customer,async()=>{await assert.rejects(()=>rpc('chefos_activate_order',["'order_test'"]),/captured payment/i)});
 await rpc('chefos_server_capture',['$1','$2','$3','$4'],['order_test','pay_test',prepared.quote.amount_paise,'INR']);
@@ -101,7 +142,7 @@ await db.query('update chefos_private.chef_rate_inputs set pilot_started_at=curr
 assert.equal((await rpc('chefos_private.quote_rate',['$1','3',"'monthly'",'1'],[chef])).pilot_cook_rate,false);
 await actor(admin,()=>rpc('chefos_ops_update',["'subscriptions'",'$1',`'{"is_active":false}'`],[subscription.id]));
 const tomorrow=(await db.query("select ((now() at time zone 'Asia/Kolkata')::date+1)::text as day")).rows[0].day;
-const second=await rpc('chefos_server_prepare_order',['$1','$2'],[other,{...booking,start_date:tomorrow}]);
+const second=await rpc('chefos_private.chefos_prepare_subscription',['$1','$2'],[other,{...booking,start_date:tomorrow}]);
 await rpc('chefos_server_record_order',['$1',"'order_other'",'$2'],[other,second]);
 await rpc('chefos_server_capture',["'order_other'","'pay_other'",'$1',"'INR'"],[second.quote.amount_paise]);
 await actor(other,()=>rpc('chefos_activate_order',["'order_other'"]));
@@ -116,4 +157,8 @@ if(process.env.CHEFOS_TEST_FIXTURES){
  const fixtures={};await actor(admin,async()=>{for(const section of ['overview','customers','chefs','subscriptions','payments','pricing','activity'])fixtures[section]=await rpc('chefos_ops_data',['$1'],[section])});
  await writeFile(process.env.CHEFOS_TEST_FIXTURES,JSON.stringify(fixtures,null,2));
 }
+await testVisits(db,actor,rpc,admin,diet);
+await testSessionSafety(db,actor,rpc,admin,diet);
+await testInstantVisits(db,actor,rpc,admin);
+await testTestEnvironment(db,actor,rpc);
 await db.close();

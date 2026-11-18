@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Constants from "expo-constants";
+import { Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "../auth/AuthContext";
@@ -30,6 +31,16 @@ import { OnboardingScreen } from "../screens/OnboardingScreen";
 import { CustomerLoginScreen } from "../screens/CustomerLoginScreen";
 import { CustomerDetailsScreen } from "../screens/CustomerDetailsScreen";
 import { WeeklyMenuScreen } from "../screens/WeeklyMenuScreen";
+import { FoodProfileScreen } from "../screens/FoodProfileScreen";
+import { HouseholdScreen } from "../screens/HouseholdScreen";
+import { ChefScheduleScreen } from "../screens/ChefScheduleScreen";
+import { MenuPreviewScreen } from "../screens/PersonalisedMenuScreen";
+import { ChefCookingScreen } from "../screens/ChefCookingScreen";
+import { SessionScreen } from "../screens/SessionScreen";
+import { InstantScreen } from "../screens/InstantScreen";
+import { ChefSelfieScreen } from "../screens/ChefSelfieScreen";
+import { api } from "../api/client";
+import { Button, LoadingState, Screen } from "../components/ui";
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -99,9 +110,29 @@ function UserTabs() {
 }
 
 function ChefStack() {
+  const [identity, setIdentity] = useState(null);
+  const [identityError, setIdentityError] = useState("");
+  const loadIdentity = useCallback(async () => {
+    setIdentityError("");
+    try {
+      const { data } = await api.get("identity/status/");
+      setIdentity(data);
+    } catch (error) {
+      setIdentityError(error.message);
+    }
+  }, []);
+  useEffect(() => { loadIdentity(); }, [loadIdentity]);
+  if (!identity) return <Screen>
+    {identityError ? <><Text>{identityError}</Text><Button label="Retry identity setup" onPress={loadIdentity} /></>
+      : <LoadingState label="Loading your chef identity…" />}
+  </Screen>;
+  if (!identity.enrolled) return <ChefSelfieScreen enrolment onComplete={loadIdentity} />;
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ChefHome" component={ChefHomeScreen} />
+      <Stack.Screen name="ChefSchedule" component={ChefScheduleScreen} />
+      <Stack.Screen name="ChefCooking" component={ChefCookingScreen} />
+      <Stack.Screen name="ChefSelfie" component={ChefSelfieScreen} />
     </Stack.Navigator>
   );
 }
@@ -138,13 +169,18 @@ export function AppNavigator() {
         <Stack.Screen name="CustomerTabs" component={UserTabs} />
         <Stack.Screen name="ChefProfile" component={ChefProfileScreen} />
         <Stack.Screen name="Booking" component={BookingScreen} />
+        <Stack.Screen name="FoodProfile" component={FoodProfileScreen} />
+        <Stack.Screen name="Household" component={HouseholdScreen} />
         <Stack.Screen name="ReviewBooking" component={ReviewBookingScreen} />
+        <Stack.Screen name="MenuPreview" component={MenuPreviewScreen} />
         <Stack.Screen
           name="BookingConfirmed"
           component={BookingConfirmedScreen}
         />
         <Stack.Screen name="Menu" component={WeeklyMenuScreen} />
         <Stack.Screen name="Today" component={ScheduleScreen} />
+        <Stack.Screen name="Session" component={SessionScreen} />
+        <Stack.Screen name="Instant" component={InstantScreen} />
       </Stack.Navigator>
     );
   }

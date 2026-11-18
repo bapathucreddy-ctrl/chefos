@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api/client";
 import { openCheckout } from "../api/checkout";
 import { useAuth } from "../auth/AuthContext";
-import { Button, Input, Screen } from "../components/ui";
+import { Button, Screen } from "../components/ui";
 import {
   Header,
   ChefAvatar,
@@ -16,146 +16,77 @@ import {
   PAPER,
   s,
 } from "../components/reference";
-import { slotLabel } from "../utils/slots";
+import { slotLabel, visitLabel } from "../utils/slots";
 import { currencyInr, titleCase } from "../utils/format";
-function localDate(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-function tomorrow() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return date;
-}
+import { Expandable, PeoplePicker, Segments, StepProgress } from "../components/interactive";
 export function BookingScreen({ route, navigation }) {
   const { chef } = route.params;
-  const [day, setDay] = useState(localDate(tomorrow())),
-    [meal, setMeal] = useState("lunch"),
-    [wave, setWave] = useState("L2"),
-    [people, setPeople] = useState("3"),
-    [cycle, setCycle] = useState("monthly");
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = tomorrow();
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-  return (
-    <Screen background={PAPER} contentContainerStyle={{ padding: 22, gap: 24 }}>
-      <Header title={`Book ${chef.name}`} onBack={() => navigation.goBack()} />
-      <View style={s.row}>
-        <ChefAvatar chef={chef} size={44} />
-        <View>
-          <Text style={s.subtitle}>{chef.name}</Text>
-          <Text style={s.small}>{chef.speciality}</Text>
-        </View>
-      </View>
-      <Text style={s.subtitle}>Select Date</Text>
-      <ScrollView
-        horizontal
-        contentContainerStyle={{ gap: 9 }}
-        showsHorizontalScrollIndicator={false}
-      >
-        {days.map((d) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={localDate(d)}
-            key={localDate(d)}
-            onPress={() => setDay(localDate(d))}
-            style={[
-              s.chip,
-              day === localDate(d) && s.chosen,
-              { alignItems: "center", minWidth: 59, gap: 5 },
-            ]}
-          >
-            <Text style={s.small}>
-              {d.toLocaleDateString("en-IN", { weekday: "short" })}
-            </Text>
-            <Text style={s.subtitle}>{d.getDate()}</Text>
-            <Text style={s.small}>
-              {d.toLocaleDateString("en-IN", { month: "short" })}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <Text style={s.subtitle}>Select Time</Text>
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        {["breakfast", "lunch", "dinner"].map((m) => (
-          <Chip
-            key={m}
-            label={titleCase(m)}
-            selected={meal === m}
-            onPress={() => {
-              setMeal(m);
-              setWave(chef.available_waves?.[m]?.[0] || "");
-            }}
-          />
-        ))}
-      </View>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        {(chef.available_waves?.[meal] || []).map((w) => (
-          <Chip
-            key={w}
-            label={slotLabel(w)}
-            selected={wave === w}
-            onPress={() => setWave(w)}
-          />
-        ))}
-      </View>
-      <Text style={s.subtitle}>Service Type</Text>
-      <View style={[s.card, { borderColor: GOLD, backgroundColor: "#fff8e8" }]}>
-        <View style={s.row}>
-          <Ionicons name="checkmark-circle" size={24} color={GOLD} />
-          <View>
-            <Text style={s.subtitle}>Daily Meals</Text>
-            <Text style={s.small}>Regular home meals, on your schedule</Text>
-          </View>
-        </View>
-      </View>
-      <Input
-        label="People at home (1–8)"
-        keyboardType="number-pad"
-        value={people}
-        onChangeText={setPeople}
-      />
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        {["weekly", "monthly", "quarterly"].map((c) => (
-          <Chip
-            key={c}
-            label={titleCase(c)}
-            selected={cycle === c}
-            onPress={() => setCycle(c)}
-          />
-        ))}
-      </View>
-      <Notice>
-        Special occasions and custom services require a separate quote. This
-        booking is for a recurring meal plan.
-      </Notice>
-      <Button
-        label="Continue"
-        disabled={
-          !/^[1-8]$/.test(people) ||
-          !chef.available_waves?.[meal]?.includes(wave)
-        }
-        onPress={() =>
-          navigation.navigate("ReviewBooking", {
-            chef,
-            booking: {
-              chef: chef.id,
-              meal_type: [meal],
-              meal_wave: { [meal]: wave },
-              people_count: Number(people),
-              plan_cycle: cycle,
-              start_date: day,
-            },
-          })
-        }
-      />
-    </Screen>
-  );
+  const indiaDate = (offset = 0) => {
+    const d = new Date(Date.now() + 330 * 60000);
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + offset)).toISOString().slice(0, 10);
+  };
+  const [day, setDay] = useState(() => indiaDate()), [meals, setMeals] = useState(["lunch"]);
+  const [step, setStep] = useState(0);
+  const [together, setTogether] = useState(false), [people, setPeople] = useState("3"), [cycle, setCycle] = useState("monthly");
+  const [options, setOptions] = useState({}), [selected, setSelected] = useState({}), [loading, setLoading] = useState(true), [error, setError] = useState("");
+  const groups = useMemo(() => together ? [meals] : meals.map((m) => [m]), [meals, together]);
+  const days = Array.from({ length: 7 }, (_, i) => indiaDate(i));
+  useEffect(() => {
+    let active = true; setLoading(true); setError(""); setOptions({});
+    Promise.all(groups.map(async (group) => {
+      const { data } = await api.get("scheduling/options/", { params: { chef: chef.id, start_date: day, plan_cycle: cycle, meal_type: group.join(",") } });
+      return [group.join("+"), data];
+    })).then((rows) => {
+      if (!active) return;
+      setOptions(Object.fromEntries(rows));
+      setSelected((old) => Object.fromEntries(rows.map(([key, values]) => [key, values.some((v) => v.start_minute === old[key]) ? old[key] : values[0]?.start_minute])));
+    }).catch((e) => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [chef.id, day, cycle, groups]);
+  function toggleMeal(m) {
+    const next = meals.includes(m) ? meals.filter((v) => v !== m) : [...meals, m];
+    if (next.length) setMeals(["breakfast", "lunch", "dinner"].filter((v) => next.includes(v)));
+  }
+  const valid = !loading && !error && /^[1-8]$/.test(people) && groups.every((g) => (options[g.join("+")] || []).some((v) => v.start_minute === selected[g.join("+")]));
+  return <Screen key={step} background={PAPER} contentContainerStyle={{ padding: 22, gap: 24 }}>
+    <Header title={`Book ${chef.name}`} onBack={() => step ? setStep(0) : navigation.goBack()} />
+    <StepProgress steps={["Your meals & household", "Your plan & cooking time"]} current={step} onSelect={setStep} />
+    <View style={s.row}><ChefAvatar chef={chef} size={44} /><View><Text style={s.subtitle}>{chef.name}</Text><Text style={s.small}>{chef.speciality}</Text></View></View>
+    {step === 0 ? <>
+    <Text style={s.subtitle}>Select Date</Text>
+    <ScrollView horizontal contentContainerStyle={{ gap: 9 }} showsHorizontalScrollIndicator={false}>
+      {days.map((date) => <Pressable accessibilityRole="button" accessibilityLabel={date} key={date} onPress={() => setDay(date)}
+        style={[s.chip, day === date && s.chosen, { alignItems: "center", minWidth: 59, gap: 5 }]}>
+        <Text style={s.small}>{new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "short", timeZone: "Asia/Kolkata" })}</Text>
+        <Text style={s.subtitle}>{date.slice(-2)}</Text><Text style={s.small}>{date === indiaDate() ? "Today" : new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" })}</Text>
+      </Pressable>)}
+    </ScrollView>
+    <Text style={s.subtitle}>Meals per day</Text>
+    <View style={{ flexDirection: "row", gap: 8 }}>{["breakfast", "lunch", "dinner"].map((m) => <Chip key={m} label={titleCase(m)} selected={meals.includes(m)} onPress={() => toggleMeal(m)} />)}</View>
+    {meals.length > 1 ? <View style={{ gap: 10 }}><Chip label="Separate cooking visits" selected={!together} onPress={() => setTogether(false)} />
+      <Chip label="Cook these meals together" selected={together} onPress={() => setTogether(true)} /></View> : null}
+    <Text style={s.small}>{together && meals.length > 1 ? `${meals.length} meals · ${meals.length} hours together` : "One cooking hour per meal"}</Text>
+    <PeoplePicker value={people} onChange={setPeople} />
+    <Button label="Choose plan & time" variant="gold" onPress={() => setStep(1)} />
+    </> : <>
+    <Text style={s.title}>Make it a routine.</Text>
+    <Segments label="Plan duration" value={cycle} onChange={setCycle} options={[{ value: "weekly", label: "7 days" }, { value: "monthly", label: "30 days" }, { value: "quarterly", label: "90 days" }]} />
+    <Text style={s.muted}>{titleCase(cycle)} · {day} · {people} people</Text>
+    <Text style={s.subtitle}>Select Time</Text>
+    {loading ? <Text style={s.muted}>Checking every date in your plan...</Text> : null}
+    {error ? <><Text style={s.error}>{error}</Text><Button label="Check my verified home" variant="outline" onPress={() => navigation.navigate("Household")} /></> : null}
+    {!loading && !error ? groups.map((g) => {
+      const key = g.join("+"), values = options[key] || [];
+      return <View key={key} style={{ gap: 10 }}><Text style={s.subtitle}>{g.map(titleCase).join(" + ")}</Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{values.map((v) => <Chip key={v.start_minute} label={visitLabel(v)} selected={selected[key] === v.start_minute} onPress={() => setSelected((old) => ({ ...old, [key]: v.start_minute }))} />)}</View>
+        {!values.length ? <Notice>No time is free for every service date. Choose another date, plan or chef.</Notice> : null}
+      </View>;
+    }) : null}
+    <Button label="Continue" disabled={!valid} onPress={() => navigation.navigate("MenuPreview", { chef, booking: {
+      schedule_version: 2, chef: chef.id, meal_type: meals, people_count: Number(people), plan_cycle: cycle, start_date: day,
+      visits: groups.map((g) => ({ meals: g, start_minute: selected[g.join("+")] })),
+    } })} /></>}
+  </Screen>;
 }
 export function ReviewBookingScreen({ route, navigation }) {
   const { chef, booking } = route.params;
@@ -214,8 +145,9 @@ export function ReviewBookingScreen({ route, navigation }) {
         throw new Error(
           "The quote changed. Return to your plan and review its current price before paying.",
         );
-      const payment = await openCheckout(next, session.user.email);
-      const verified = await api.post("payments/verify/", payment);
+      const verified = next.status === "paid"
+        ? { data: { subscription: (await api.post("subscription/create/", { order_id: next.order_id })).data } }
+        : await api.post("payments/verify/", await openCheckout(next, session.user.email));
       await AsyncStorage.removeItem(key);
       navigation.replace("BookingConfirmed", {
         chef,
@@ -244,11 +176,11 @@ export function ReviewBookingScreen({ route, navigation }) {
           </View>
         </View>
         <View style={s.divider} />
-        {[
+        <Expandable title="Plan details" subtitle={`${booking.start_date} · ${booking.people_count} people`}>{[
           ["Date", booking.start_date],
           [
             "Time",
-            `${titleCase(booking.meal_type[0])} · ${slotLabel(booking.meal_wave[booking.meal_type[0]])}`,
+            booking.visits ? booking.visits.map((v) => `${v.meals.map(titleCase).join(" + ")}: ${visitLabel(v)}`).join("; ") : slotLabel(booking.meal_wave[booking.meal_type[0]]),
           ],
           ["Service Type", `${titleCase(booking.plan_cycle)} daily meals`],
           ["Household", `${booking.people_count} people`],
@@ -272,7 +204,7 @@ export function ReviewBookingScreen({ route, navigation }) {
               {value}
             </Text>
           </View>
-        ))}
+        ))}</Expandable>
         <View style={s.divider} />
         <View style={s.between}>
           <Text style={s.subtitle}>Total</Text>
@@ -354,7 +286,7 @@ export function BookingConfirmedScreen({ route, navigation }) {
         <Text style={[s.muted, { color: "#e0e6ef", textAlign: "center" }]}>
           Your chef service starts on{"\n"}
           {booking.start_date} ·{" "}
-          {slotLabel(booking.meal_wave[booking.meal_type[0]])}
+          {booking.visits ? booking.visits.map(visitLabel).join(" / ") : slotLabel(booking.meal_wave[booking.meal_type[0]])}
         </Text>
       </View>
       <View style={s.card}>

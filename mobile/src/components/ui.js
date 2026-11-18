@@ -137,6 +137,7 @@ export function Input({
   secureTextEntry = false,
   multiline = false,
   keyboardType,
+  maxLength,
   autoCapitalize = "none",
   hideLabel = false,
   leading,
@@ -154,6 +155,7 @@ export function Input({
           secureTextEntry={secureTextEntry}
           multiline={multiline}
           keyboardType={keyboardType}
+          maxLength={maxLength}
           autoCapitalize={autoCapitalize}
           style={[
             styles.input,

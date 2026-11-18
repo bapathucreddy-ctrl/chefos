@@ -17,6 +17,14 @@
       "extends": "preview",
       "env": { "APP_VARIANT": "chef" }
     },
+    "preview-test": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "user", "EXPO_PUBLIC_CHEFOS_ENVIRONMENT": "test" }
+    },
+    "preview-chef-test": {
+      "extends": "preview",
+      "env": { "APP_VARIANT": "chef", "EXPO_PUBLIC_CHEFOS_ENVIRONMENT": "test" }
+    },
     "production": {
       "node": "22.16.0",
       "env": { "APP_VARIANT": "user" },

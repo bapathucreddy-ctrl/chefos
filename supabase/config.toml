@@ -27,6 +27,27 @@ enable_confirmations = true
 # signing keys. Only health/pricing-catalog routes allow anonymous requests.
 verify_jwt = false
 
+[functions.chefos-api-test]
+verify_jwt = false
+
+[functions.chefos-payments-webhook-test]
+verify_jwt = false
+
+[functions.chefos-recordings-test]
+verify_jwt = false
+
 [functions.chefos-payments-webhook]
 # Verified using the payment provider's HMAC signature over the raw body.
+verify_jwt = false
+
+[functions.chefos-menu-worker]
+# Called by the configured scheduler with its dedicated bearer secret.
+verify_jwt = false
+
+[functions.chefos-face-webhook]
+# Timestamped provider HMAC signature is verified in the handler.
+verify_jwt = false
+
+[functions.chefos-recordings]
+# Every view is authenticated, owner/dispute scoped and audit logged.
 verify_jwt = false

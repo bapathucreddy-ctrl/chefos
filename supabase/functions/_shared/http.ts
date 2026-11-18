@@ -6,7 +6,7 @@ export class HttpError extends Error {
 export function cors(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
   const allowed =
-    (Deno.env.get("CHEFOS_ALLOWED_ORIGINS") || "http://localhost:5173,http://127.0.0.1:5173").split(
+    (Deno.env.get("CHEFOS_ALLOWED_ORIGINS") || "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5175,http://127.0.0.1:5175,http://localhost:8085,http://127.0.0.1:8085").split(
       ",",
     ).map((x) => x.trim());
   return {

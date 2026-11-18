@@ -9,9 +9,10 @@ import {
 } from "react";
 import { AppState, Linking } from "react-native";
 import Constants from "expo-constants";
-import { supabase, requireSupabase } from "../api/supabase";
+import { supabase, requireSupabase, environment, isTestEnvironment, authScheme } from "../api/supabase";
 import { setCacheOwner } from "../api/cache";
 import { ROLE_CHEF, ROLE_USER } from "./session";
+import { stopChefTracking } from "../location/chefTracking";
 
 const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
@@ -29,10 +30,15 @@ export function AuthProvider({ children }) {
     async (session) => {
       const current = ++generation.current;
       if (!session) {
+        await stopChefTracking().catch(() => {});
         setCacheOwner(null);
         if (mounted.current)
           setState({ booting: false, session: null, profile: null });
         return;
+      }
+      if (isTestEnvironment) {
+        const { error } = await supabase.rpc("chefos_ensure_profile");
+        if (error) throw error;
       }
       const { data: profile, error } = await supabase
         .from("chefos_profiles")
@@ -47,7 +53,9 @@ export function AuthProvider({ children }) {
         return;
       }
       setCacheOwner(session.user.id);
-      setState({ booting: false, session, profile });
+      const activeSession = isTestEnvironment ? { ...session, user: { ...session.user, user_metadata: { ...session.user.user_metadata,
+        full_name: profile.full_name || "", city: profile.city || "", onboarding_complete: Boolean(profile.full_name && profile.city) } } } : session;
+      setState({ booting: false, session: activeSession, profile });
     },
     [appRole],
   );
@@ -73,16 +81,13 @@ export function AuthProvider({ children }) {
       setTimeout(() => {
         if (mounted.current) {
           if (event === "PASSWORD_RECOVERY") setRecovering(true);
-          hydrate(session);
+          hydrate(session).catch(() => hydrate(null));
         }
       }, 0);
     });
     async function openLink(url) {
       if (!url) return;
-      const scheme =
-        Constants.expoConfig?.extra?.appVariant === "chef"
-          ? "chefos-chef:"
-          : "chefos-user:";
+      const scheme = authScheme + ":";
       if (!url.startsWith(scheme + "//")) return;
       try {
         const parsed = new URL(url.replace("#", "?")),
@@ -148,8 +153,8 @@ export function AuthProvider({ children }) {
       email: email.trim().toLowerCase(),
       password,
       options: {
-        emailRedirectTo: "chefos-user://auth/confirm",
-        data: { username: username.trim(), account_type: "customer" },
+        emailRedirectTo: `${authScheme}://auth/confirm`,
+        data: { username: username.trim(), account_type: "customer", chefos_environment: environment },
       },
     });
     if (error) throw error;
@@ -160,13 +165,14 @@ export function AuthProvider({ children }) {
       email: payload.email.trim().toLowerCase(),
       password: payload.password,
       options: {
-        emailRedirectTo: "chefos-chef://auth/confirm",
+        emailRedirectTo: `${authScheme}://auth/confirm`,
         data: {
           username: payload.username.trim(),
           name: payload.name,
           speciality: payload.speciality,
           phone: payload.phone,
           account_type: "chef",
+          chefos_environment: environment,
         },
       },
     });
@@ -174,6 +180,7 @@ export function AuthProvider({ children }) {
     return { requiresConfirmation: !data.session };
   }, []);
   const logout = useCallback(async () => {
+    await stopChefTracking().catch(() => {});
     setRecovering(false);
     setCacheOwner(null);
     generation.current++;
@@ -181,11 +188,13 @@ export function AuthProvider({ children }) {
     if (supabase) await supabase.auth.signOut();
   }, []);
   const finishRecovery = useCallback(() => setRecovering(false), []);
+  const refreshProfile = useCallback(async () => { const { data } = await requireSupabase().auth.getSession(); await hydrate(data.session); }, [hydrate]);
   const value = useMemo(
     () => ({
       ...state,
       recovering,
       finishRecovery,
+      refreshProfile,
       role:
         state.profile?.role === "chef"
           ? ROLE_CHEF
@@ -204,6 +213,7 @@ export function AuthProvider({ children }) {
       state,
       recovering,
       finishRecovery,
+      refreshProfile,
       login,
       signupUser,
       registerChef,

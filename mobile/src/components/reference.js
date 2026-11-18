@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeBrand } from "./BrandSplash";
 import Svg, { Rect, Circle, Line } from "react-native-svg";
+import { isTestEnvironment } from "../api/supabase";
 export const NAVY = "#071B31",
   GOLD = "#FFB719",
   PAPER = "#FAF9F6";
@@ -69,9 +70,11 @@ export function Chip({ label, selected, onPress }) {
   );
 }
 export function ChefAvatar({ chef, size = 62 }) {
-  return chef?.photo_url ? (
+  const testPhotos = [require("../assets/reference/chef_01_female_chef_portrait.png"), require("../assets/reference/chef_02_male_chef_portrait.png"), require("../assets/reference/chef_04_female_chef_garnishing_food.png")];
+  const localPhoto = isTestEnvironment && chef?.id?.startsWith("eeee0000-") ? testPhotos[(Number(chef.id.slice(-12)) - 1) % testPhotos.length] : null;
+  return chef?.photo_url || localPhoto ? (
     <Image
-      source={{ uri: chef.photo_url }}
+      source={localPhoto || { uri: chef.photo_url }}
       style={{ width: size, height: size, borderRadius: 12 }}
     />
   ) : (

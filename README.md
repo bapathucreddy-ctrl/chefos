@@ -2,12 +2,19 @@
 
 Chefos uses the supplied navy, white and gold brand kit across an administrator web workspace and separate customer and chef mobile apps.
 
+The [confirmed product requirements](docs/product/PRODUCT_REQUIREMENTS.md) capture
+the owner's latest cuisine-based instant booking, personalised AI menus,
+flexible visit scheduling and verified cooking-session workflow. That document
+distinguishes the target behavior from features present in the current APKs.
+See [implementation progress](docs/product/IMPLEMENTATION_STATUS.md) for the new
+profile, scheduling, personalised menus, instant visits and cooking workflow.
+
 - **Web:** verified administrators manage customers, chef verification, rate inputs, subscriptions, payments and audit history.
 - **Android / iOS:** customer discovery, meal planning, subscription checkout and service status; chef availability, location, instant offers and service codes.
 - **Backend:** Supabase Auth, PostgreSQL with row-level security, audited RPCs, and Edge Functions. New quotes read `chefos_pricing_config.json`; paid rates stay locked.
 - **Splash:** the supplied React Native animation is available in both mobile variants, with a single animated hat and completion callback.
 
-The hosted Supabase project is connected: all nine migrations and both Edge Functions were deployed on 2026-10-20. Live health, pricing and anonymous-access checks passed. Email, phone and Google Auth are enabled. The initial administrator is activated and has signed in; provider sign-in testing, Razorpay setup and any legacy-data import remain outstanding. See [deployment and migration details](docs/SUPABASE.md).
+The hosted Supabase project is connected with 27 migrations, private selfie and recording storage, and an approved minutely worker. The same project contains 40 copied test tables and 18 synthetic chefs across Whitefield, Kodigehalli Road and KR Puram. See the [test environment setup](docs/product/TEST_ENVIRONMENT.md) for live-map simulation, test apps and shared Auth, and the [release runbook](docs/product/RELEASE_V2.md) for provider and device validation. Email, phone and Google Auth are enabled. The administrator account is activated. See [deployment and migration details](docs/SUPABASE.md).
 
 ## Local setup
 
@@ -42,7 +49,7 @@ npm run check
 npm run test:edge
 ```
 
-SQL integration tests cover the 44 pricing reference entries, ownership, staff permissions, payment activation, locked rates, instant offers and OTP privacy. Edge tests mock provider/Auth calls. Both customer and chef Android/iOS JavaScript bundles compile; no signed app or live payment was produced.
+SQL integration tests cover the 44 pricing reference entries, ownership, staff permissions, payment activation, locked rates, instant offers and OTP privacy. Edge tests mock provider/Auth calls. Both customer and chef Android/iOS JavaScript bundles compile. The November release also has recording-queue recovery tests and mocked browser walkthroughs; see the implementation progress and release runbook for hosted/APK status. No live payment was made by these tests.
 
 [Desktop admin preview](docs/chefos-admin.png) ? [Phone admin preview](docs/chefos-admin-mobile.png) ? [Splash test frame](docs/chefos-splash-test.png). Admin screenshots use isolated test data.
 
